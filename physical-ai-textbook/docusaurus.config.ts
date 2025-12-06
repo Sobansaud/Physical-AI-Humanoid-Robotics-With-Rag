@@ -13,7 +13,7 @@ const config: Config = {
   baseUrl: '/',
 
   organizationName: 'Sobansaud',
-  projectName: 'Physical-AI-Humanoid-Robotics-New',
+  projectName: 'Physical-AI-Humanoid-Robotics-With-Rag',
 
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',

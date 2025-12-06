@@ -24,7 +24,7 @@ app.add_middleware(
     allow_origins=[
         "*",  # Keep * for now if you want open access, or restrict:
         "http://localhost:3000",
-        "https://physical-ai-humanoid-robotics-new.vercel.app"
+        # "https://physical-ai-humanoid-robotics-new.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],

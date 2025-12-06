@@ -76,11 +76,6 @@ export default function ChatbotComponent(): JSX.Element {
             }
         };
 
-        // Debounce selection to avoid accidental triggers? 
-        // For now, simpler: user usually selects then maybe clicks a button? 
-        // User asked: "agar user text ko select bhi karega thou wo text select hotai hai chatbot main chala jayega" -> "as soon as select, it goes to chatbot"
-        // MouseUp event is best for "selection finished"
-
         const onMouseUp = () => {
             // slight delay to ensure selection is populated
             setTimeout(handleSelection, 100);
