@@ -1,7 +1,6 @@
 import clsx from "clsx";
 import Link from "@docusaurus/Link";
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
-import ChatbotComponent from "../components/ChatbotComponent";
 import Layout from "@theme/Layout";
 import Heading from "@theme/Heading";
 import styles from "./index.module.css";
@@ -105,7 +104,6 @@ export default function Home(): JSX.Element {
   return (
     <Layout title={`${siteConfig.title}`} description="Physical AI & Humanoid Robotics Textbook">
       <HomepageHeader />
-      <ChatbotComponent />
 
       <main>
         <section style={{ padding: "6rem 0", position: "relative" }}>

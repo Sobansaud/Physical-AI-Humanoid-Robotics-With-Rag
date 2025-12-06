@@ -1,5 +1,6 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import ChatbotComponent from '../components/ChatbotComponent';
 
 function Root({ children }) {
   return (
@@ -11,6 +12,7 @@ function Root({ children }) {
         transition={{ duration: 0.3 }}
       >
         {children}
+        <ChatbotComponent />
       </motion.div>
     </AnimatePresence>
   );
