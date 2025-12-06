@@ -1,0 +1,598 @@
+# Week 9: AI-Powered Perception and Manipulation - Seeing and Acting Intelligently
+
+## Building Robotic Perception and Dexterous Control
+
+This week dives into the core AI capabilities that enable robots to perceive their environment and manipulate objects with human-like dexterity. You'll learn to combine computer vision, motion planning, and control to create systems that can see, understand, and interact with the world. Through Isaac's advanced tools, you'll build perception pipelines that work reliably in complex, real-world conditions.
+
+## Advanced Perception Pipelines
+
+### Multi-Modal Sensor Fusion
+
+Modern robotic perception combines multiple sensing modalities for robust understanding:
+
+```python
+from isaac.perception import MultiModalFusion
+from isaac.sensors import Camera, Lidar, IMU
+
+class AdvancedPerception:
+    def __init__(self):
+        # Initialize sensors
+        self.camera = Camera(resolution=(1920, 1080), fps=30)
+        self.lidar = Lidar(range=30.0, angular_resolution=0.5)
+        self.imu = IMU()
+        
+        # Fusion pipeline
+        self.fusion = MultiModalFusion()
+        
+        # Processing components
+        self.object_detector = ObjectDetector(model="dino_v2")
+        self.pose_estimator = PoseEstimator(method="PnP")
+        self.tracker = MultiObjectTracker()
+        
+    def process_environment(self):
+        # Capture sensor data
+        rgb_image = self.camera.get_rgb()
+        depth_image = self.camera.get_depth()
+        point_cloud = self.lidar.get_point_cloud()
+        imu_data = self.imu.get_reading()
+        
+        # Fuse camera and LIDAR data
+        fused_point_cloud = self.fusion.fuse_depth_and_lidar(
+            depth_image, point_cloud, self.camera.get_intrinsics()
+        )
+        
+        # Detect objects
+        detections = self.object_detector.detect(rgb_image)
+        
+        # Estimate 6DoF poses
+        poses = []
+        for detection in detections:
+            # Crop object region
+            object_crop = self.crop_object(rgb_image, detection.bbox)
+            object_points = self.segment_object(fused_point_cloud, detection.bbox)
+            
+            # Estimate pose
+            pose = self.pose_estimator.estimate_pose(
+                object_crop, object_points, detection.class_id
+            )
+            poses.append(pose)
+        
+        # Track objects across time
+        tracked_objects = self.tracker.update(detections, poses)
+        
+        return tracked_objects
+```
+
+### Deep Learning for Perception
+
+#### Object Detection and Segmentation
+
+```python
+import torch
+from torchvision.models.detection import maskrcnn_resnet50_fpn
+
+class AdvancedObjectDetector:
+    def __init__(self):
+        self.model = maskrcnn_resnet50_fpn(pretrained=True)
+        self.model.eval()
+        
+        # Move to GPU if available
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model.to(self.device)
+        
+        # Preprocessing
+        self.transform = self.get_transform()
+    
+    def get_transform(self):
+        return torch.nn.Sequential(
+            torch.nn.functional.interpolate(size=(800, 800), mode='bilinear'),
+            torch.nn.Normalize(mean=[0.485, 0.456, 0.406], 
+                             std=[0.229, 0.224, 0.225])
+        )
+    
+    def detect(self, image):
+        # Preprocess image
+        image_tensor = torch.from_numpy(image).permute(2, 0, 1).float() / 255.0
+        image_tensor = self.transform(image_tensor.unsqueeze(0)).to(self.device)
+        
+        # Inference
+        with torch.no_grad():
+            predictions = self.model(image_tensor)[0]
+        
+        # Process results
+        detections = []
+        for i, (box, score, label, mask) in enumerate(zip(
+            predictions['boxes'], predictions['scores'], 
+            predictions['labels'], predictions['masks'])):
+            
+            if score > 0.5:  # Confidence threshold
+                detection = {
+                    'bbox': box.cpu().numpy(),
+                    'score': score.item(),
+                    'class_id': label.item(),
+                    'mask': mask.cpu().numpy(),
+                    'class_name': self.class_names[label.item()]
+                }
+                detections.append(detection)
+        
+        return detections
+```
+
+#### 6DoF Pose Estimation
+
+```python
+from isaac.pose_estimation import DeepPoseEstimator
+
+class PoseEstimationPipeline:
+    def __init__(self):
+        self.pose_estimator = DeepPoseEstimator(
+            model_path="/models/pose_estimator.onnx",
+            object_models="/models/cad_models/"
+        )
+        
+        # Refinement methods
+        self.icp_refiner = ICPRefiner()
+        self.pnp_solver = PnPSolver()
+    
+    def estimate_pose(self, rgb_image, depth_image, detection):
+        # Initial pose estimation using deep learning
+        initial_pose = self.pose_estimator.estimate(
+            rgb_image, detection['mask']
+        )
+        
+        # Generate object point cloud from CAD model
+        object_points = self.load_cad_model(detection['class_id'])
+        
+        # Refine pose using ICP
+        refined_pose = self.icp_refiner.refine(
+            initial_pose, object_points, depth_image,
+            camera_intrinsics=self.camera_intrinsics
+        )
+        
+        # Final validation
+        if self.validate_pose(refined_pose, depth_image):
+            return refined_pose
+        else:
+            return None
+    
+    def validate_pose(self, pose, depth_image):
+        # Project CAD model onto image
+        projected_points = self.project_3d_to_2d(
+            self.cad_model_points, pose, self.camera_intrinsics
+        )
+        
+        # Check if projection matches depth
+        errors = []
+        for point in projected_points:
+            if self.is_valid_pixel(point):
+                predicted_depth = pose[2, 3]  # Z translation
+                actual_depth = depth_image[int(point[1]), int(point[0])]
+                errors.append(abs(predicted_depth - actual_depth))
+        
+        # Validate pose if average error is small
+        return np.mean(errors) < 0.05 if errors else False
+```
+
+## AI-Powered Manipulation
+
+### Grasp Planning and Execution
+
+```python
+from isaac.manipulation import GraspPlanner, ForceController
+
+class DexterousManipulation:
+    def __init__(self):
+        self.grasp_planner = GraspPlanner()
+        self.force_controller = ForceController()
+        self.motion_planner = MotionPlanner()
+        
+        # Load gripper model
+        self.gripper_model = self.load_gripper_model()
+    
+    def plan_grasp(self, object_pose, object_geometry, target_grasp_type="power"):
+        """Plan a stable grasp for the object"""
+        
+        # Generate grasp candidates
+        grasp_candidates = self.grasp_planner.generate_candidates(
+            object_geometry=object_geometry,
+            grasp_type=target_grasp_type,
+            num_candidates=50
+        )
+        
+        # Evaluate grasp quality
+        best_grasp = None
+        best_score = -float('inf')
+        
+        for candidate in grasp_candidates:
+            # Simulate grasp
+            simulation_result = self.simulate_grasp(
+                candidate, object_pose, object_geometry
+            )
+            
+            # Score grasp quality
+            score = self.evaluate_grasp_quality(
+                simulation_result, candidate
+            )
+            
+            if score > best_score:
+                best_score = score
+                best_grasp = candidate
+        
+        return best_grasp, best_score
+    
+    def execute_grasp(self, grasp, object_pose):
+        """Execute the planned grasp"""
+        
+        # Plan pre-grasp approach
+        approach_trajectory = self.plan_approach_trajectory(
+            self.get_current_pose(), grasp.pre_grasp_pose
+        )
+        
+        # Execute approach
+        if not self.execute_trajectory(approach_trajectory):
+            return False
+        
+        # Open gripper
+        self.gripper.open()
+        
+        # Move to grasp pose
+        grasp_trajectory = self.plan_grasp_trajectory(
+            grasp.pre_grasp_pose, grasp.grasp_pose
+        )
+        
+        if not self.execute_trajectory(grasp_trajectory):
+            return False
+        
+        # Close gripper with force control
+        success = self.force_controller.close_gripper(
+            target_force=grasp.target_force,
+            max_width=grasp.max_width
+        )
+        
+        return success
+    
+    def evaluate_grasp_quality(self, simulation_result, grasp):
+        """Evaluate grasp stability and quality"""
+        
+        # Force closure - can the grasp resist external forces?
+        force_closure = self.check_force_closure(simulation_result)
+        
+        # Form closure - is the grasp geometrically stable?
+        form_closure = self.check_form_closure(grasp, simulation_result)
+        
+        # Wrench resistance - can it resist torques?
+        wrench_resistance = self.check_wrench_resistance(simulation_result)
+        
+        # Grasp width efficiency
+        width_efficiency = 1.0 - (grasp.width / self.gripper_max_width)
+        
+        # Combine metrics
+        quality_score = (
+            0.4 * force_closure +
+            0.3 * form_closure + 
+            0.2 * wrench_resistance +
+            0.1 * width_efficiency
+        )
+        
+        return quality_score
+```
+
+### Motion Planning with AI
+
+```python
+from isaac.planning import AIMotionPlanner
+
+class IntelligentMotionPlanner:
+    def __init__(self):
+        self.collision_checker = CollisionChecker()
+        self.trajectory_optimizer = TrajectoryOptimizer()
+        self.learning_planner = LearningBasedPlanner()
+        
+        # Load pre-trained models
+        self.load_models()
+    
+    def plan_manipulation(self, start_pose, object_pose, goal_pose, environment):
+        """Plan a complete manipulation sequence"""
+        
+        # Phase 1: Approach object
+        approach_trajectory = self.plan_approach(
+            start_pose, object_pose, environment
+        )
+        
+        # Phase 2: Grasp execution
+        grasp_trajectory = self.plan_grasp_execution(
+            approach_trajectory.end_pose, object_pose
+        )
+        
+        # Phase 3: Object transport
+        transport_trajectory = self.plan_transport(
+            grasp_trajectory.end_pose, goal_pose, environment
+        )
+        
+        # Phase 4: Place and release
+        place_trajectory = self.plan_placement(
+            transport_trajectory.end_pose, goal_pose
+        )
+        
+        # Combine into complete sequence
+        complete_trajectory = self.combine_trajectories([
+            approach_trajectory, grasp_trajectory, 
+            transport_trajectory, place_trajectory
+        ])
+        
+        # Optimize for smoothness and speed
+        optimized_trajectory = self.trajectory_optimizer.optimize(
+            complete_trajectory, 
+            objectives=['smoothness', 'speed', 'safety']
+        )
+        
+        return optimized_trajectory
+    
+    def plan_approach(self, start, object_pose, environment):
+        """Plan collision-free approach to object"""
+        
+        # Define approach constraints
+        approach_vector = self.compute_approach_vector(object_pose)
+        standoff_distance = 0.1  # meters
+        
+        # Generate via points
+        via_points = self.generate_approach_points(
+            start, object_pose, approach_vector, standoff_distance
+        )
+        
+        # Plan trajectory through points
+        trajectory = self.plan_through_points(via_points, environment)
+        
+        return trajectory
+    
+    def generate_approach_points(self, start, object_pose, approach_vector, standoff):
+        """Generate safe approach waypoints"""
+        
+        # Calculate standoff pose
+        standoff_pose = object_pose.copy()
+        standoff_pose.translate(-approach_vector * standoff)
+        
+        # Generate intermediate points for smooth approach
+        points = [start]
+        
+        # Add via points with collision checking
+        num_points = 5
+        for i in range(1, num_points + 1):
+            t = i / num_points
+            interpolated_pose = self.interpolate_pose(start, standoff_pose, t)
+            
+            if not self.collision_checker.check_pose(interpolated_pose, environment):
+                points.append(interpolated_pose)
+            else:
+                # Find collision-free alternative
+                alternative_pose = self.find_alternative_pose(
+                    interpolated_pose, environment
+                )
+                if alternative_pose:
+                    points.append(alternative_pose)
+        
+        points.append(standoff_pose)
+        return points
+```
+
+## Learning-Based Manipulation
+
+### Imitation Learning for Grasping
+
+```python
+from isaac.learning import ImitationLearner
+
+class GraspImitationLearner:
+    def __init__(self):
+        self.learner = ImitationLearner(
+            observation_space=self.get_observation_space(),
+            action_space=self.get_action_space()
+        )
+        
+        # Demonstration dataset
+        self.demonstrations = self.load_demonstrations()
+    
+    def get_observation_space(self):
+        """Define observation space for grasping"""
+        return {
+            'rgb_image': (480, 640, 3),
+            'depth_image': (480, 640, 1),
+            'gripper_pose': (7,),  # position + quaternion
+            'object_pose': (7,)   # position + quaternion
+        }
+    
+    def get_action_space(self):
+        """Define action space for grasping"""
+        return {
+            'gripper_command': (4,),  # x, y, z, width
+            'terminate': (1,)         # binary termination signal
+        }
+    
+    def learn_from_demonstrations(self):
+        """Train policy from human demonstrations"""
+        
+        # Process demonstrations
+        training_data = []
+        for demo in self.demonstrations:
+            episode_data = self.process_demonstration(demo)
+            training_data.extend(episode_data)
+        
+        # Train behavioral cloning model
+        self.learner.train_bc(training_data)
+        
+        # Fine-tune with DAgger (Dataset Aggregation)
+        self.dagger_finetune()
+    
+    def process_demonstration(self, demonstration):
+        """Convert demonstration to training data"""
+        
+        processed_data = []
+        for state, action in zip(demonstration['states'], demonstration['actions']):
+            # Extract observations
+            observation = {
+                'rgb_image': state['rgb'],
+                'depth_image': state['depth'],
+                'gripper_pose': state['gripper_pose'],
+                'object_pose': state['object_pose']
+            }
+            
+            # Extract actions
+            processed_action = {
+                'gripper_command': action['gripper_command'],
+                'terminate': action['terminate']
+            }
+            
+            processed_data.append((observation, processed_action))
+        
+        return processed_data
+    
+    def execute_learned_grasp(self, object_pose):
+        """Execute grasping using learned policy"""
+        
+        done = False
+        while not done:
+            # Get current observation
+            observation = self.get_current_observation(object_pose)
+            
+            # Predict action
+            action = self.learner.predict(observation)
+            
+            # Execute action
+            self.execute_gripper_action(action['gripper_command'])
+            
+            # Check termination
+            done = action['terminate'] > 0.5
+            
+            # Small delay for stability
+            time.sleep(0.1)
+```
+
+## Real-Time Performance Optimization
+
+### Parallel Processing Pipelines
+
+```python
+import concurrent.futures
+from isaac.perception import ParallelProcessor
+
+class OptimizedPerceptionPipeline:
+    def __init__(self):
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+        self.processors = {
+            'detection': ObjectDetector(),
+            'segmentation': SemanticSegmenter(),
+            'depth': DepthEstimator(),
+            'tracking': ObjectTracker()
+        }
+    
+    def process_frame_parallel(self, frame):
+        """Process frame using parallel execution"""
+        
+        # Submit tasks to thread pool
+        futures = {}
+        futures['detection'] = self.executor.submit(
+            self.processors['detection'].detect, frame
+        )
+        futures['segmentation'] = self.executor.submit(
+            self.processors['segmentation'].segment, frame
+        )
+        futures['depth'] = self.executor.submit(
+            self.processors['depth'].estimate, frame
+        )
+        
+        # Wait for results
+        results = {}
+        for task, future in futures.items():
+            results[task] = future.result()
+        
+        # Sequential tracking (depends on detection results)
+        results['tracking'] = self.processors['tracking'].update(
+            results['detection']
+        )
+        
+        return results
+```
+
+### Edge Optimization
+
+```python
+from isaac.optimization import EdgeOptimizer
+
+class EdgeOptimizedPerception:
+    def __init__(self):
+        self.optimizer = EdgeOptimizer(target_device="jetson_orin")
+        
+        # Load optimized models
+        self.models = self.load_optimized_models()
+        
+        # Configure processing pipeline
+        self.pipeline_config = self.configure_pipeline()
+    
+    def load_optimized_models(self):
+        """Load TensorRT-optimized models"""
+        return {
+            'detector': self.optimizer.load_model('yolov5.engine'),
+            'segmenter': self.optimizer.load_model('unet.engine'),
+            'depth_net': self.optimizer.load_model('fastdepth.engine')
+        }
+    
+    def configure_pipeline(self):
+        """Configure processing for edge constraints"""
+        return {
+            'input_resolution': (640, 480),  # Reduced for speed
+            'batch_size': 1,
+            'precision': 'fp16',  # Half precision for speed
+            'max_inference_time': 50,  # ms
+            'power_mode': 'max_performance'
+        }
+    
+    def process_efficiently(self, frame):
+        """Process with edge optimizations"""
+        
+        # Resize input if needed
+        if frame.shape[:2] != self.pipeline_config['input_resolution'][::-1]:
+            frame = cv2.resize(frame, self.pipeline_config['input_resolution'])
+        
+        # Run inference with timing constraints
+        start_time = time.time()
+        
+        detections = self.models['detector'].infer(frame)
+        segmentation = self.models['segmenter'].infer(frame)
+        depth = self.models['depth_net'].infer(frame)
+        
+        inference_time = (time.time() - start_time) * 1000  # ms
+        
+        # Check performance constraints
+        if inference_time > self.pipeline_config['max_inference_time']:
+            self.optimizer.adjust_performance_mode()
+        
+        return {
+            'detections': detections,
+            'segmentation': segmentation,
+            'depth': depth,
+            'inference_time': inference_time
+        }
+```
+
+## Weekly Project: Complete Perception-Manipulation System
+
+Build an integrated system that can perceive and manipulate objects:
+
+1. **Multi-Modal Perception**: Combine vision, depth, and tactile sensing
+2. **Object Understanding**: Detect, segment, and estimate poses of objects
+3. **Grasp Planning**: Generate stable grasps using AI and geometric methods
+4. **Motion Execution**: Plan and execute manipulation trajectories
+5. **Learning Integration**: Incorporate learned grasping strategies
+6. **Real-Time Performance**: Optimize for edge deployment
+
+This project demonstrates the complete pipeline from visual perception to physical manipulation.
+
+## Key Takeaways
+
+1. **Multi-modal fusion enables robust perception** by combining complementary sensor information
+2. **Deep learning transforms perception capabilities** with accurate detection and pose estimation
+3. **AI-powered manipulation planning** generates human-like grasping and movement strategies
+4. **Real-time optimization is crucial** for practical robotic deployment
+5. **Learning from demonstration accelerates skill acquisition** for complex manipulation tasks
+
+Mastering perception and manipulation gives your robots the ability to understand and interact with the world in sophisticated ways, forming the foundation for advanced Physical AI applications.

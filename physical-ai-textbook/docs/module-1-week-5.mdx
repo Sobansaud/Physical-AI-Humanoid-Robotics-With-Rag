@@ -1,0 +1,632 @@
+# Week 5: Building ROS 2 Packages with Python - Creating Deployable Systems
+
+## From Components to Complete Applications
+
+This final week of Module 1 focuses on packaging your ROS 2 components into complete, deployable applications. You'll learn how to structure code for reusability, create comprehensive launch files, and build systems that can be easily shared and deployed. By the end of this week, you'll have the skills to create professional-grade ROS 2 packages.
+
+## ROS 2 Package Structure
+
+### Package Creation and Setup
+
+ROS 2 packages follow a standardized structure that ensures consistency and discoverability:
+
+```bash
+# Create a new package
+ros2 pkg create --build-type ament_python --node-name my_robot_node my_robot_pkg
+
+# Package structure
+my_robot_pkg/
+├── package.xml          # Package metadata and dependencies
+├── setup.py            # Python package configuration
+├── setup.cfg           # Build configuration
+├── my_robot_pkg/       # Python package directory
+│   ├── __init__.py
+│   └── my_robot_node.py
+├── launch/             # Launch files directory
+│   └── robot_launch.py
+├── config/             # Configuration files
+│   └── default.yaml
+├── test/               # Test files
+│   └── test_robot_node.py
+└── README.md           # Documentation
+```
+
+### Package.xml Configuration
+
+The package.xml file defines your package's identity and requirements:
+
+```xml
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>my_robot_pkg</name>
+  <version>1.0.0</version>
+  <description>A comprehensive robot control package</description>
+  <maintainer email="your.email@example.com">Your Name</maintainer>
+  <license>Apache-2.0</license>
+
+  <!-- Dependencies -->
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+
+  <!-- Test dependencies -->
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>ament_xmllint</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
+```
+
+### Setup.py Configuration
+
+The setup.py file configures the Python package:
+
+```python
+from setuptools import setup
+import os
+from glob import glob
+
+package_name = 'my_robot_pkg'
+
+setup(
+    name=package_name,
+    version='1.0.0',
+    packages=[package_name],
+    data_files=[
+        # Install package.xml
+        ('share/' + package_name, ['package.xml']),
+        
+        # Install launch files
+        ('share/' + package_name + '/launch', glob('launch/*.py')),
+        
+        # Install config files
+        ('share/' + package_name + '/config', glob('config/*.yaml')),
+        
+        # Install RViz configurations
+        ('share/' + package_name + '/rviz', glob('rviz/*.rviz')),
+    ],
+    install_requires=['setuptools'],
+    zip_safe=True,
+    maintainer='Your Name',
+    maintainer_email='your.email@example.com',
+    description='A comprehensive robot control package',
+    license='Apache-2.0',
+    tests_require=['pytest'],
+    entry_points={
+        'console_scripts': [
+            'robot_node = my_robot_pkg.robot_node:main',
+            'sensor_node = my_robot_pkg.sensor_node:main',
+            'control_node = my_robot_pkg.control_node:main',
+        ],
+    },
+)
+```
+
+## Advanced Launch File Design
+
+### Modular Launch Architecture
+
+Complex systems require well-organized launch files:
+
+```python
+from launch import LaunchDescription
+from launch.actions import (
+    DeclareLaunchArgument, IncludeLaunchDescription,
+    GroupAction, TimerAction, OpaqueFunction
+)
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import (
+    LaunchConfiguration, PathJoinSubstitution,
+    EnvironmentVariable, PythonExpression
+)
+from launch.conditions import IfCondition, UnlessCondition
+from launch_ros.actions import Node, PushRosNamespace
+from launch_ros.substitutions import FindPackageShare
+from ament_index_python.packages import get_package_share_directory
+
+def generate_launch_description():
+    """Generate launch description for complete robot system"""
+    
+    # Declare launch arguments
+    use_sim_time = DeclareLaunchArgument(
+        'use_sim_time', default_value='false',
+        description='Use simulation time')
+    
+    robot_name = DeclareLaunchArgument(
+        'robot_name', default_value='my_robot',
+        description='Name of the robot')
+    
+    enable_rviz = DeclareLaunchArgument(
+        'enable_rviz', default_value='true',
+        description='Enable RViz visualization')
+    
+    # Define paths
+    pkg_share = FindPackageShare('my_robot_pkg')
+    config_path = PathJoinSubstitution([pkg_share, 'config', 'robot_config.yaml'])
+    rviz_config_path = PathJoinSubstitution([pkg_share, 'rviz', 'robot.rviz'])
+    
+    # Robot description
+    robot_description = ParameterValue(
+        Command(['xacro ', PathJoinSubstitution([pkg_share, 'urdf', 'robot.urdf.xacro'])]),
+        value_type=str
+    )
+    
+    # Core robot nodes
+    robot_state_publisher = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        name='robot_state_publisher',
+        parameters=[{
+            'robot_description': robot_description,
+            'use_sim_time': LaunchConfiguration('use_sim_time')
+        }]
+    )
+    
+    # Sensor nodes group
+    sensor_nodes = GroupAction([
+        PushRosNamespace(LaunchConfiguration('robot_name')),
+        
+        Node(
+            package='my_robot_pkg',
+            executable='sensor_node',
+            name='sensor_node',
+            parameters=[config_path],
+            remappings=[
+                ('/sensor_data', 'sensors/data'),
+                ('/imu', 'imu/data')
+            ]
+        ),
+        
+        Node(
+            package='my_robot_pkg',
+            executable='lidar_node',
+            name='lidar_node',
+            parameters=[config_path]
+        )
+    ])
+    
+    # Control nodes with conditional execution
+    control_nodes = GroupAction(
+        condition=UnlessCondition(LaunchConfiguration('use_sim_time')),
+        actions=[
+            PushRosNamespace(LaunchConfiguration('robot_name')),
+            
+            Node(
+                package='my_robot_pkg',
+                executable='control_node',
+                name='control_node',
+                parameters=[config_path]
+            )
+        ]
+    )
+    
+    # RViz visualization
+    rviz = Node(
+        condition=IfCondition(LaunchConfiguration('enable_rviz')),
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        arguments=['-d', rviz_config_path],
+        parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}]
+    )
+    
+    # Delayed startup for dependent nodes
+    delayed_nodes = TimerAction(
+        period=5.0,
+        actions=[
+            Node(
+                package='my_robot_pkg',
+                executable='navigation_node',
+                name='navigation_node',
+                parameters=[config_path]
+            )
+        ]
+    )
+    
+    return LaunchDescription([
+        use_sim_time,
+        robot_name,
+        enable_rviz,
+        
+        robot_state_publisher,
+        sensor_nodes,
+        control_nodes,
+        rviz,
+        delayed_nodes
+    ])
+```
+
+### Launch File Best Practices
+
+#### Configuration Management
+```python
+# config/robot_config.yaml
+robot:
+  name: "my_robot"
+  sensors:
+    lidar:
+      frame_id: "lidar_link"
+      range_min: 0.1
+      range_max: 30.0
+    camera:
+      width: 640
+      height: 480
+      fps: 30
+  control:
+    max_linear_velocity: 1.0
+    max_angular_velocity: 1.5
+    safety_enabled: true
+
+# Load configuration in launch file
+config_path = PathJoinSubstitution([pkg_share, 'config', 'robot_config.yaml'])
+
+robot_node = Node(
+    package='my_robot_pkg',
+    executable='robot_node',
+    parameters=[config_path]
+)
+```
+
+#### Environment-Specific Launches
+```python
+# launch/robot_dev.launch.py - Development environment
+def generate_launch_description():
+    return LaunchDescription([
+        # Development settings
+        DeclareLaunchArgument('log_level', default_value='DEBUG'),
+        DeclareLaunchArgument('use_sim_time', default_value='true'),
+        
+        # Include main launch with dev settings
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([pkg_share, 'launch', 'robot.launch.py'])
+            ]),
+            launch_arguments={
+                'log_level': LaunchConfiguration('log_level'),
+                'use_sim_time': LaunchConfiguration('use_sim_time')
+            }.items()
+        )
+    ])
+
+# launch/robot_prod.launch.py - Production environment
+def generate_launch_description():
+    return LaunchDescription([
+        # Production settings
+        DeclareLaunchArgument('log_level', default_value='INFO'),
+        DeclareLaunchArgument('use_sim_time', default_value='false'),
+        
+        # Include main launch with prod settings
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([pkg_share, 'launch', 'robot.launch.py'])
+            ]),
+            launch_arguments={
+                'log_level': LaunchConfiguration('log_level'),
+                'use_sim_time': LaunchConfiguration('use_sim_time')
+            }.items()
+        )
+    ])
+```
+
+## Testing and Quality Assurance
+
+### Unit Testing with pytest
+
+```python
+# test/test_robot_node.py
+import pytest
+import rclpy
+from my_robot_pkg.robot_node import RobotNode
+
+class TestRobotNode:
+    @pytest.fixture
+    def node(self):
+        rclpy.init()
+        node = RobotNode()
+        yield node
+        node.destroy_node()
+        rclpy.shutdown()
+    
+    def test_node_initialization(self, node):
+        """Test that node initializes correctly"""
+        assert node.get_name() == 'robot_node'
+        assert node.get_parameter('max_velocity').value == 1.0
+    
+    def test_velocity_callback(self, node):
+        """Test velocity command processing"""
+        from geometry_msgs.msg import Twist
+        
+        msg = Twist()
+        msg.linear.x = 0.5
+        msg.angular.z = 0.2
+        
+        # This would normally publish to a topic
+        # In test, we can check internal state changes
+        initial_velocity = node.current_velocity
+        node.velocity_callback(msg)
+        assert node.current_velocity != initial_velocity
+    
+    def test_safety_limits(self, node):
+        """Test that safety limits are enforced"""
+        from geometry_msgs.msg import Twist
+        
+        msg = Twist()
+        msg.linear.x = 10.0  # Exceeds limit
+        msg.angular.z = 5.0  # Exceeds limit
+        
+        node.velocity_callback(msg)
+        
+        # Check that values were clamped
+        assert abs(node.current_velocity.linear.x) <= node.get_parameter('max_velocity').value
+        assert abs(node.current_velocity.angular.z) <= node.get_parameter('max_angular_velocity').value
+```
+
+### Integration Testing
+
+```python
+# test/test_system_integration.py
+import pytest
+import rclpy
+import time
+from std_msgs.msg import String
+from geometry_msgs.msg import Twist
+
+class TestSystemIntegration:
+    def test_sensor_to_control_pipeline(self):
+        """Test complete sensor → processing → control pipeline"""
+        rclpy.init()
+        
+        # Create test nodes
+        sensor_node = MockSensorNode()
+        control_node = ControlNode()
+        
+        # Start nodes
+        executor = rclpy.executors.SingleThreadedExecutor()
+        executor.add_node(sensor_node)
+        executor.add_node(control_node)
+        
+        # Run for a short time
+        start_time = time.time()
+        while time.time() - start_time < 2.0:
+            executor.spin_once(timeout_sec=0.1)
+        
+        # Verify data flow
+        assert control_node.received_sensor_data
+        assert control_node.generated_control_commands
+        
+        # Cleanup
+        executor.shutdown()
+        rclpy.shutdown()
+```
+
+### Launch Testing
+
+```python
+# test/test_launch.py
+import pytest
+import os
+from launch import LaunchDescription
+from launch.actions import ExecuteProcess
+from launch_testing import LaunchTestService
+from launch_testing.asserts import assertExitCodes
+
+@pytest.mark.launch_test
+def generate_test_description():
+    """Generate launch description for testing"""
+    return LaunchDescription([
+        # Launch the robot system
+        ExecuteProcess(
+            cmd=['ros2', 'launch', 'my_robot_pkg', 'robot.launch.py'],
+            output='screen'
+        ),
+        
+        # Test service
+        LaunchTestService()
+    ])
+
+class TestLaunch:
+    def test_robot_nodes_start(self, launch_service):
+        """Test that all robot nodes start successfully"""
+        # Wait for nodes to be discovered
+        launch_service.wait_for_node('robot_node', timeout=10.0)
+        launch_service.wait_for_node('sensor_node', timeout=10.0)
+        launch_service.wait_for_node('control_node', timeout=10.0)
+    
+    def test_topics_exist(self, launch_service):
+        """Test that expected topics are published"""
+        # Check for topic existence
+        topics = launch_service.get_topic_names_and_types()
+        assert '/robot_pose' in [topic[0] for topic in topics]
+        assert '/cmd_vel' in [topic[0] for topic in topics]
+    
+    def test_services_available(self, launch_service):
+        """Test that expected services are available"""
+        services = launch_service.get_service_names_and_types()
+        assert '/get_robot_status' in [service[0] for service in services]
+```
+
+## Documentation and Deployment
+
+### README.md Best Practices
+
+```markdown
+# My Robot Package
+
+A comprehensive ROS 2 package for robot control and navigation.
+
+## Features
+
+- Multi-sensor integration (LIDAR, camera, IMU)
+- Real-time control with safety limits
+- Path planning and obstacle avoidance
+- RViz visualization support
+
+## Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/my_robot_pkg.git
+cd my_robot_pkg
+
+# Install dependencies
+rosdep install -i --from-path src --rosdistro humble -y
+
+# Build the package
+colcon build --packages-select my_robot_pkg
+
+# Source the workspace
+source install/setup.bash
+```
+
+## Usage
+
+### Basic Launch
+```bash
+ros2 launch my_robot_pkg robot.launch.py
+```
+
+### With RViz Visualization
+```bash
+ros2 launch my_robot_pkg robot.launch.py enable_rviz:=true
+```
+
+### Development Mode
+```bash
+ros2 launch my_robot_pkg robot_dev.launch.py
+```
+
+## Configuration
+
+Edit `config/robot_config.yaml` to customize:
+- Sensor parameters
+- Control gains
+- Safety limits
+
+## Testing
+
+```bash
+# Run unit tests
+colcon test --packages-select my_robot_pkg
+
+# Run integration tests
+colcon test --packages-select my_robot_pkg --pytest-args -k "integration"
+```
+
+## API Documentation
+
+### Nodes
+
+#### robot_node
+Main control node handling sensor fusion and motion control.
+
+**Subscribed Topics:**
+- `/cmd_vel` (geometry_msgs/Twist) - Velocity commands
+
+**Published Topics:**
+- `/robot_pose` (geometry_msgs/PoseStamped) - Current robot pose
+- `/robot_status` (my_robot_pkg/RobotStatus) - System status
+
+**Services:**
+- `/get_robot_status` (my_robot_pkg/GetRobotStatus) - Get current status
+
+### Parameters
+
+- `max_velocity` (double, default: 1.0) - Maximum linear velocity (m/s)
+- `max_angular_velocity` (double, default: 1.5) - Maximum angular velocity (rad/s)
+- `safety_enabled` (bool, default: true) - Enable safety limits
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## License
+
+Apache 2.0
+```
+
+### Docker Deployment
+
+```dockerfile
+# Dockerfile
+FROM ros:humble
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create workspace
+WORKDIR /ros2_ws/src
+COPY . /ros2_ws/src/my_robot_pkg/
+
+# Install Python dependencies
+RUN pip3 install -r requirements.txt
+
+# Build the workspace
+WORKDIR /ros2_ws
+RUN colcon build --packages-select my_robot_pkg
+
+# Source the workspace
+RUN echo "source /ros2_ws/install/setup.bash" >> ~/.bashrc
+
+# Set entrypoint
+ENTRYPOINT ["/ros2_ws/install/my_robot_pkg/lib/my_robot_pkg/robot_node"]
+```
+
+## Package Distribution
+
+### Creating Debian Packages
+
+```bash
+# Build Debian package
+bloom-generate rosdebian --os-name ubuntu --os-version jammy --ros-distro humble
+fakeroot debian/rules binary
+
+# Install locally
+sudo dpkg -i ../ros-humble-my-robot-pkg_1.0.0-1_amd64.deb
+```
+
+### Publishing to ROS Index
+
+1. Create a GitHub repository
+2. Add proper metadata to package.xml
+3. Submit to ROS Index
+4. Maintain release branches
+
+## Weekly Project: Complete ROS 2 Package
+
+Create a professional-grade ROS 2 package that includes:
+
+1. **Modular Node Architecture**: Separate nodes for sensing, processing, and control
+2. **Comprehensive Launch System**: Multiple launch files for different use cases
+3. **Configuration Management**: YAML-based parameter configuration
+4. **Testing Suite**: Unit and integration tests
+5. **Documentation**: Complete README and API documentation
+6. **Deployment Ready**: Docker containerization and installation scripts
+
+This project will serve as the foundation for all subsequent modules and demonstrate your ability to create production-ready ROS 2 software.
+
+## Key Takeaways
+
+1. **Package structure provides consistency** and discoverability for ROS 2 software
+2. **Launch files enable complex system orchestration** with proper dependency management
+3. **Testing ensures reliability** and prevents regressions in complex systems
+4. **Documentation and deployment practices** make software accessible to the community
+5. **Modular design enables reusability** and maintainability
+
+Congratulations! You've completed Module 1 and mastered the foundational skills of Physical AI. The ROS 2 packages you build here will serve as the communication backbone for all your future robotic systems.
+
+## Next Steps
+
+Module 2 will introduce digital twin technology, where you'll create virtual replicas of your physical systems for testing and development. The ROS 2 infrastructure you've built will integrate seamlessly with Gazebo and Unity simulation environments.

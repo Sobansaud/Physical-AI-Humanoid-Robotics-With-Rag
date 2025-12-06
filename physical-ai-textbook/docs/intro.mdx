@@ -1,0 +1,82 @@
+---
+slug: /intro
+---
+
+import ChapterPreviewCard from '@site/src/components/ChapterPreviewCard';
+
+# Physical AI & Humanoid Robotics
+
+**Focus and Theme:** AI Systems in the Physical World. Embodied Intelligence.  
+**Goal:** Bridging the gap between the digital brain and the physical body. Students apply their AI knowledge to control Humanoid Robots in simulated and real-world environments.
+
+## Quarter Overview
+
+The future of AI extends beyond digital spaces into the physical world. This capstone quarter introduces **Physical AI**—AI systems that function in reality and comprehend physical laws. Students learn to design, simulate, and deploy humanoid robots capable of natural human interactions using **ROS 2**, **Gazebo**, and **NVIDIA Isaac**.
+
+## Module Breakdown
+
+### Module 1: The Robotic Nervous System (ROS 2)
+**Focus:** Middleware for robot control.
+- ROS 2 Nodes, Topics, and Services.
+- Bridging Python Agents to ROS controllers using `rclpy`.
+- Understanding URDF (Unified Robot Description Format) for humanoids.
+
+### Module 2: The Digital Twin (Gazebo & Unity)
+**Focus:** Physics simulation and environment building.
+- Simulating physics, gravity, and collisions in Gazebo.
+- High-fidelity rendering and human-robot interaction in Unity.
+- Simulating sensors: LiDAR, Depth Cameras, and IMUs.
+
+### Module 3: The AI-Robot Brain (NVIDIA Isaac™)
+**Focus:** Advanced perception and training.
+- **NVIDIA Isaac Sim:** Photorealistic simulation and synthetic data generation.
+- **Isaac ROS:** Hardware-accelerated VSLAM (Visual SLAM) and navigation.
+- **Nav2:** Path planning for bipedal humanoid movement.
+
+### Module 4: Vision-Language-Action (VLA)
+**Focus:** The convergence of LLMs and Robotics.
+- **Voice-to-Action:** Using OpenAI Whisper for voice commands.
+- **Cognitive Planning:** Using LLMs to translate natural language ("Clean the room") into a sequence of ROS 2 actions.
+- **Capstone Project:** The Autonomous Humanoid. A final project where a simulated robot receives a voice command, plans a path, navigates obstacles, identifies an object using computer vision, and manipulates it.
+
+## Why Physical AI Matters
+
+Humanoid robots are poised to excel in our human-centered world because they share our physical form and can be trained with abundant data from interacting in human environments. This represents a significant transition from AI models confined to digital environments to **embodied intelligence** that operates in physical space.
+
+## Learning Outcomes
+
+- Understand Physical AI principles and embodied intelligence
+- Master ROS 2 (Robot Operating System) for robotic control
+- Simulate robots with Gazebo and Unity
+- Develop with NVIDIA Isaac AI robot platform
+- Design humanoid robots for natural interactions
+- Integrate GPT models for conversational robotics
+
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-12">
+  <ChapterPreviewCard
+    title="Module 1: Robotic Nervous Systems (ROS 2)"
+    description="Master the communication architecture that powers modern robotics, from nodes and topics to distributed systems."
+    to="/docs/module-1-overview"
+  />
+  <ChapterPreviewCard
+    title="Module 2: Digital Twin (Gazebo & Unity)"
+    description="Create accurate virtual replicas of physical systems for testing, training, and validation."
+    to="/docs/module-2-overview"
+  />
+  <ChapterPreviewCard
+    title="Module 3: AI-Robot Brain (NVIDIA Isaac™)"
+    description="Integrate advanced AI perception, planning, and control using hardware-accelerated computing."
+    to="/docs/module-3-overview"
+  />
+  <ChapterPreviewCard
+    title="Module 4: Vision-Language-Action (VLA)"
+    description="Build systems where robots understand natural language and execute complex tasks through vision and manipulation."
+    to="/docs/module-4-overview"
+  />
+  <ChapterPreviewCard
+    title="Why Physical AI Matters"
+    description="Explore the transformative impact of embodied intelligence on industry, society, and human potential."
+    to="/docs/why-physical-ai-matters"
+  />
+</div>
+

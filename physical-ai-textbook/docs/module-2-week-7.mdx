@@ -1,0 +1,525 @@
+# Week 7: URDF and SDF Robot Description Formats - Defining Robot Anatomy
+
+## The Blueprint of Robotic Systems
+
+This week dives deep into the languages that define robotic anatomy: URDF (Unified Robot Description Format) and SDF (Simulation Description Format). You'll learn to create detailed robot models that capture everything from kinematics to collision properties, forming the foundation of accurate digital twins. By week's end, you'll be able to describe complex robotic systems with precision and realism.
+
+## URDF Fundamentals
+
+### What is URDF?
+
+URDF is an XML-based format specifically designed for describing robot kinematics and dynamics. It focuses on:
+
+- **Kinematic Chains**: How links are connected through joints
+- **Coordinate Frames**: Reference frames for sensors and actuators
+- **Physical Properties**: Mass, inertia, and material properties
+- **Visual Representation**: How the robot appears in simulation
+
+### Basic URDF Structure
+
+```xml
+<?xml version="1.0"?>
+<robot name="my_robot">
+  
+  <!-- Links define rigid bodies -->
+  <link name="base_link">
+    <!-- Visual properties for rendering -->
+    <visual>
+      <geometry>
+        <box size="0.5 0.3 0.2"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    
+    <!-- Collision properties for physics -->
+    <collision>
+      <geometry>
+        <box size="0.5 0.3 0.2"/>
+      </geometry>
+    </collision>
+    
+    <!-- Physical properties -->
+    <inertial>
+      <mass value="10.0"/>
+      <inertia ixx="0.1" ixy="0" ixz="0" iyy="0.1" iyz="0" izz="0.1"/>
+    </inertial>
+  </link>
+
+  <!-- Joints define connections between links -->
+  <joint name="wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="wheel_link"/>
+    <origin xyz="0 0.2 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+</robot>
+```
+
+## Advanced Link Definitions
+
+### Complex Geometries
+
+#### Mesh-Based Models
+
+```xml
+<link name="robotic_arm">
+  <visual>
+    <geometry>
+      <mesh filename="package://my_robot/meshes/robotic_arm.dae" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="metal">
+      <color rgba="0.7 0.7 0.7 1"/>
+    </material>
+  </visual>
+  <collision>
+    <geometry>
+      <!-- Simplified collision geometry for performance -->
+      <cylinder radius="0.05" length="0.5"/>
+    </geometry>
+  </collision>
+</link>
+```
+
+#### Composite Geometries
+
+```xml
+<link name="sensor_head">
+  <visual>
+    <geometry>
+      <!-- Multiple visual elements -->
+      <box size="0.1 0.1 0.1"/>
+    </geometry>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+  </visual>
+  <visual>
+    <geometry>
+      <cylinder radius="0.02" length="0.1"/>
+    </geometry>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+  </visual>
+  <collision>
+    <geometry>
+      <!-- Single collision geometry -->
+      <box size="0.12 0.12 0.15"/>
+    </geometry>
+  </collision>
+</link>
+```
+
+### Inertial Properties
+
+Accurate inertial properties are crucial for realistic simulation:
+
+```xml
+<inertial>
+  <!-- Total mass of the link -->
+  <mass value="2.5"/>
+  
+  <!-- Center of mass offset from link origin -->
+  <origin xyz="0 0 0.1" rpy="0 0 0"/>
+  
+  <!-- Inertia tensor (symmetric 3x3 matrix) -->
+  <inertia ixx="0.05" ixy="0" ixz="0" 
+           iyy="0.05" iyz="0" 
+           izz="0.01"/>
+</inertial>
+```
+
+#### Calculating Inertia
+
+For complex shapes, calculate inertia using:
+- **Parallel Axis Theorem**: For mass offset from center of mass
+- **Composite Bodies**: Sum inertias of component shapes
+- **CAD Integration**: Export inertial properties from design software
+
+## Joint Types and Configurations
+
+### Joint Classification
+
+URDF supports several joint types:
+
+#### Revolute Joints (Rotary)
+
+```xml
+<joint name="elbow_joint" type="revolute">
+  <parent link="upper_arm"/>
+  <child link="forearm"/>
+  <origin xyz="0 0.3 0" rpy="0 0 0"/>
+  <axis xyz="0 1 0"/>
+  <limit lower="-2.0" upper="2.0" effort="100" velocity="1.0"/>
+  <dynamics damping="0.1" friction="0.1"/>
+</joint>
+```
+
+#### Prismatic Joints (Linear)
+
+```xml
+<joint name="linear_actuator" type="prismatic">
+  <parent link="base"/>
+  <child link="platform"/>
+  <origin xyz="0 0 0.5" rpy="0 0 0"/>
+  <axis xyz="0 0 1"/>
+  <limit lower="0.0" upper="1.0" effort="500" velocity="0.1"/>
+</joint>
+```
+
+#### Continuous Joints (Unlimited Rotation)
+
+```xml
+<joint name="wheel_joint" type="continuous">
+  <parent link="chassis"/>
+  <child link="wheel"/>
+  <origin xyz="0.2 0 0" rpy="0 0 0"/>
+  <axis xyz="0 1 0"/>
+  <dynamics damping="0.1" friction="1.0"/>
+</joint>
+```
+
+#### Fixed Joints (Rigid Connections)
+
+```xml
+<joint name="camera_mount" type="fixed">
+  <parent link="head"/>
+  <child link="camera"/>
+  <origin xyz="0 0 0.1" rpy="0 0 0"/>
+</joint>
+```
+
+### Advanced Joint Features
+
+#### Mimic Joints
+
+```xml
+<joint name="finger_1" type="revolute">
+  <mimic joint="thumb" multiplier="0.5" offset="0"/>
+  <!-- This joint follows the thumb joint with 0.5x multiplier -->
+</joint>
+```
+
+#### Safety Controllers
+
+```xml
+<joint name="arm_joint">
+  <safety_controller soft_lower_limit="-2.5" soft_upper_limit="2.5" 
+                     k_position="100" k_velocity="10"/>
+  <!-- Software safety limits -->
+</joint>
+```
+
+## Coordinate Frames and Transformations
+
+### Understanding TF (Transform) Trees
+
+URDF defines the kinematic chain through nested coordinate frames:
+
+```xml
+<!-- Base coordinate frame -->
+<link name="world"/>
+
+<!-- Robot base -->
+<joint name="world_to_base" type="fixed">
+  <parent link="world"/>
+  <child link="base_link"/>
+  <origin xyz="0 0 0" rpy="0 0 0"/>
+</joint>
+
+<link name="base_link">
+  <!-- Base link definition -->
+</link>
+
+<!-- Arm chain -->
+<joint name="base_to_shoulder" type="revolute">
+  <parent link="base_link"/>
+  <child link="shoulder_link"/>
+  <origin xyz="0 0 0.5" rpy="0 0 0"/>
+  <axis xyz="0 0 1"/>
+</joint>
+```
+
+### Transform Conventions
+
+- **Right-Hand Rule**: X forward, Y left, Z up (common in robotics)
+- **Rotation Order**: Roll (X), Pitch (Y), Yaw (Z)
+- **Units**: Meters for distances, radians for angles
+
+## Xacro: URDF Macros
+
+### Why Xacro?
+
+Xacro (XML Macros) extends URDF with programming constructs:
+
+- **Macros**: Reusable component definitions
+- **Parameters**: Configurable properties
+- **Math**: Computational expressions
+- **Includes**: Modular file composition
+
+### Basic Xacro Usage
+
+```xml
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="modular_robot">
+
+  <!-- Property definitions -->
+  <xacro:property name="wheel_radius" value="0.05"/>
+  <xacro:property name="wheel_width" value="0.02"/>
+  <xacro:property name="base_length" value="0.4"/>
+  
+  <!-- Macro definitions -->
+  <xacro:macro name="wheel" params="name parent x y">
+    <link name="${name}_link">
+      <visual>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </visual>
+      <collision>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="0.5"/>
+        <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+      </inertial>
+    </link>
+    
+    <joint name="${name}_joint" type="continuous">
+      <parent link="${parent}"/>
+      <child link="${name}_link"/>
+      <origin xyz="${x} ${y} 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- Base link -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="${base_length} 0.3 0.1"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- Instantiate wheels using macro -->
+  <xacro:wheel name="front_left" parent="base_link" x="${base_length/2}" y="0.15"/>
+  <xacro:wheel name="front_right" parent="base_link" x="${base_length/2}" y="-0.15"/>
+  <xacro:wheel name="rear_left" parent="base_link" x="-${base_length/2}" y="0.15"/>
+  <xacro:wheel name="rear_right" parent="base_link" x="-${base_length/2}" y="-0.15"/>
+
+</robot>
+```
+
+### Advanced Xacro Features
+
+#### Conditional Logic
+
+```xml
+<xacro:macro name="sensor_config" params="has_lidar has_camera">
+  <xacro:if value="${has_lidar}">
+    <!-- LIDAR sensor definition -->
+  </xacro:if>
+  
+  <xacro:if value="${has_camera}">
+    <!-- Camera sensor definition -->
+  </xacro:if>
+</xacro:macro>
+```
+
+#### File Inclusion
+
+```xml
+<xacro:include filename="$(find my_robot)/urdf/common/sensors.urdf.xacro"/>
+<xacro:include filename="$(find my_robot)/urdf/common/actuators.urdf.xacro"/>
+```
+
+## SDF Extensions
+
+### Simulation-Specific Features
+
+SDF extends URDF with simulation capabilities:
+
+```xml
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <model name="advanced_robot">
+    
+    <!-- URDF-compatible link -->
+    <link name="base_link">
+      <visual>
+        <geometry>
+          <box>
+            <size>0.5 0.3 0.2</size>
+          </box>
+        </geometry>
+      </visual>
+      <collision>
+        <geometry>
+          <box>
+            <size>0.5 0.3 0.2</size>
+          </box>
+        </geometry>
+        <!-- SDF-specific surface properties -->
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.8</mu>
+              <mu2>0.6</mu2>
+            </ode>
+          </friction>
+          <contact>
+            <ode>
+              <kp>1e8</kp>
+              <kd>1</kd>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+    </link>
+
+    <!-- Advanced joint with SDF features -->
+    <joint name="arm_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>arm_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1.57</lower>
+          <upper>1.57</upper>
+          <effort>100</effort>
+          <velocity>1.0</velocity>
+        </limit>
+        <dynamics>
+          <damping>0.1</damping>
+          <friction>0.1</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+
+  </model>
+</sdf>
+```
+
+### Converting Between Formats
+
+```bash
+# URDF to SDF
+gz sdf -p my_robot.urdf > my_robot.sdf
+
+# SDF to URDF (limited compatibility)
+# Note: Some SDF features don't translate to URDF
+```
+
+## Validation and Debugging
+
+### URDF Validation Tools
+
+```bash
+# Check URDF syntax
+check_urdf my_robot.urdf
+
+# With xacro processing
+xacro my_robot.urdf.xacro > my_robot.urdf
+check_urdf my_robot.urdf
+
+# Visualize URDF
+urdf_to_graphiz my_robot.urdf
+```
+
+### Common Issues and Solutions
+
+#### Inertial Property Errors
+- **Symptom**: "Inertia must be positive definite"
+- **Solution**: Ensure inertia matrix is physically valid
+
+#### Joint Limit Violations
+- **Symptom**: Joints moving beyond specified limits
+- **Solution**: Check joint type and limit specifications
+
+#### Collision Geometry Problems
+- **Symptom**: Unexpected collision behavior
+- **Solution**: Verify collision geometries match visual representations
+
+## Integration with ROS 2
+
+### Robot State Publisher
+
+```python
+# Launch robot state publisher
+from launch_ros.actions import Node
+
+robot_state_publisher = Node(
+    package='robot_state_publisher',
+    executable='robot_state_publisher',
+    parameters=[{
+        'robot_description': robot_description_content,
+        'use_sim_time': use_sim_time
+    }]
+)
+```
+
+### Joint State Publisher
+
+```python
+joint_state_publisher = Node(
+    package='joint_state_publisher',
+    executable='joint_state_publisher',
+    parameters=[{
+        'robot_description': robot_description_content,
+        'rate': 50
+    }]
+)
+```
+
+## Performance Optimization
+
+### Model Simplification
+
+```xml
+<!-- Use simplified collision geometries -->
+<collision>
+  <geometry>
+    <!-- Simple bounding box instead of complex mesh -->
+    <box size="0.6 0.4 0.3"/>
+  </geometry>
+</collision>
+```
+
+### Level of Detail (LOD)
+
+```xml
+<!-- Distance-based detail switching -->
+<visual name="high_detail">
+  <geometry>
+    <mesh filename="high_res.stl"/>
+  </geometry>
+  <!-- LOD plugin would switch to low_res.stl at distance -->
+</visual>
+```
+
+## Weekly Project: Complete Robot Model
+
+Create a comprehensive robot description that includes:
+
+1. **Multi-Link Kinematic Chain**: Base, torso, arms, and end-effectors
+2. **Accurate Physical Properties**: Mass, inertia, and collision geometries
+3. **Sensor Integration**: Cameras, LIDAR, and IMUs properly positioned
+4. **Xacro Modularization**: Reusable components and configurable parameters
+5. **SDF Extensions**: Simulation-specific properties and surface interactions
+6. **ROS 2 Compatibility**: Proper frame definitions for tf tree
+
+This project will give you a production-ready robot model that serves as the foundation for all subsequent simulation work.
+
+## Key Takeaways
+
+1. **URDF defines robot kinematics and structure** with links, joints, and coordinate frames
+2. **SDF extends URDF with simulation features** like surface properties and advanced physics
+3. **Xacro enables modular and parameterized designs** for reusable robot components
+4. **Accurate physical properties are essential** for realistic simulation behavior
+5. **Validation and debugging tools ensure model correctness** before simulation deployment
+
+Mastering robot description formats gives you the power to create digital twins that accurately represent physical systems, forming the foundation of all Physical AI development.

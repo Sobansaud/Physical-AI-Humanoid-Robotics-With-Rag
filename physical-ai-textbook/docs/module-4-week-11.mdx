@@ -1,0 +1,572 @@
+# Week 11: Humanoid Robot Development - Mastering Human-Like Robotics
+
+## Building Robots That Move Like Humans
+
+Welcome to the fascinating world of humanoid robotics, where machines attempt to replicate the most complex and capable form of locomotion and manipulation known to us—human movement. This week introduces the unique challenges and techniques of humanoid robot development, focusing on bipedal locomotion, balance control, and human-like interaction. You'll learn why humanoids are uniquely challenging and how to approach their development systematically.
+
+## The Humanoid Challenge
+
+### Why Humanoids Are Different
+
+Humanoid robots differ fundamentally from wheeled or fixed-base manipulators:
+
+```python
+class HumanoidChallenges:
+    """Key challenges in humanoid robot development"""
+    
+    def dynamic_balance(self):
+        """Maintaining stability on two legs"""
+        # Humans use ~300 muscles for balance
+        # Robots must coordinate 20+ joints in real-time
+        # Balance requires predicting and reacting to disturbances
+        pass
+    
+    def energy_efficiency(self):
+        """Humans are remarkably efficient walkers"""
+        # Human walking efficiency: ~25% of energy returned to motion
+        # Robot walking efficiency: Often <5% without optimization
+        # Energy management affects battery life and thermal constraints
+        pass
+    
+    def perception_guidance(self):
+        """Using vision and sensing for human-like awareness"""
+        # Humans integrate multiple senses seamlessly
+        # Robots must fuse IMU, vision, and tactile data
+        # Real-time processing enables adaptive movement
+        pass
+    
+    def human_interaction(self):
+        """Moving comfortably around and with humans"""
+        # Human-sized robots create unique safety concerns
+        # Social navigation requires understanding human behavior
+        # Natural movement patterns reduce user discomfort
+        pass
+```
+
+### Humanoid Design Principles
+
+#### Morphological Considerations
+
+```xml
+<!-- Humanoid robot URDF structure -->
+<robot name="humanoid_robot">
+  <!-- Base coordinate frame -->
+  <link name="base_link"/>
+  
+  <!-- Legs (6 DOF each typical) -->
+  <link name="left_hip_link"/>
+  <link name="left_knee_link"/>
+  <link name="left_ankle_link"/>
+  <joint name="left_hip_pitch" type="revolute">
+    <parent link="base_link"/>
+    <child link="left_hip_link"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.5" upper="0.5" effort="100" velocity="2"/>
+  </joint>
+  <!-- Additional leg joints: roll, yaw, knee, ankle pitch/roll -->
+  
+  <!-- Torso (2-3 DOF) -->
+  <link name="torso_link"/>
+  <joint name="torso_pitch" type="revolute">
+    <parent link="base_link"/>
+    <child link="torso_link"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+  
+  <!-- Arms (7 DOF each typical) -->
+  <link name="left_shoulder_link"/>
+  <joint name="left_shoulder_pitch" type="revolute">
+    <parent link="torso_link"/>
+    <child link="left_shoulder_link"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+  <!-- Additional arm joints: roll, yaw, elbow, wrist -->
+  
+  <!-- Head (2-3 DOF) -->
+  <link name="head_link"/>
+  <joint name="head_pan" type="revolute">
+    <parent link="torso_link"/>
+    <child link="head_link"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+</robot>
+```
+
+## Bipedal Locomotion Fundamentals
+
+### Walking Biomechanics
+
+Humans walk using an inverted pendulum model with step-to-step transitions:
+
+```python
+class BipedalWalker:
+    """Simplified bipedal walking controller"""
+    
+    def __init__(self):
+        self.step_length = 0.3  # meters
+        self.step_height = 0.05  # meters
+        self.walking_speed = 0.5  # m/s
+        
+        # Walking phases
+        self.support_leg = "left"
+        self.swing_leg = "right"
+        
+        # Balance control
+        self.zmp_controller = ZMPController()
+        self.balance_feedback = BalanceFeedback()
+    
+    def plan_step(self, target_position):
+        """Plan a single step toward target"""
+        
+        # Calculate step parameters
+        current_pos = self.get_current_position()
+        step_vector = target_position - current_pos
+        
+        # Generate foot trajectory
+        foot_trajectory = self.generate_foot_trajectory(
+            start_pos=self.get_support_foot_pos(),
+            end_pos=target_position,
+            step_height=self.step_height
+        )
+        
+        # Plan center of mass trajectory
+        com_trajectory = self.plan_com_trajectory(
+            current_com=self.get_com_position(),
+            foot_trajectory=foot_trajectory
+        )
+        
+        # Check balance feasibility
+        if not self.zmp_controller.check_feasibility(com_trajectory):
+            # Adjust step for balance
+            foot_trajectory = self.adjust_step_for_balance(
+                foot_trajectory, com_trajectory
+            )
+        
+        return foot_trajectory, com_trajectory
+    
+    def generate_foot_trajectory(self, start_pos, end_pos, step_height):
+        """Generate smooth foot trajectory"""
+        
+        # Cubic spline for smooth motion
+        trajectory = []
+        num_points = 50
+        
+        for i in range(num_points):
+            t = i / (num_points - 1)
+            
+            # X position (linear)
+            x = start_pos[0] + t * (end_pos[0] - start_pos[0])
+            
+            # Y position (linear)
+            y = start_pos[1] + t * (end_pos[1] - start_pos[1])
+            
+            # Z position (parabolic for step height)
+            if t < 0.5:
+                z = start_pos[2] + 4 * step_height * t * (1 - t)
+            else:
+                z = end_pos[2]
+            
+            trajectory.append([x, y, z])
+        
+        return trajectory
+    
+    def plan_com_trajectory(self, current_com, foot_trajectory):
+        """Plan center of mass movement"""
+        
+        com_trajectory = []
+        
+        for foot_pos in foot_trajectory:
+            # Keep COM centered over support foot during single support
+            if self.is_single_support_phase():
+                target_com = [
+                    foot_pos[0],  # X aligned with support foot
+                    foot_pos[1],  # Y aligned with support foot
+                    current_com[2]  # Maintain height
+                ]
+            else:
+                # During double support, move COM toward next step
+                target_com = self.interpolate_com_position(foot_pos)
+            
+            com_trajectory.append(target_com)
+        
+        return com_trajectory
+```
+
+### Balance Control Systems
+
+#### Zero Moment Point (ZMP) Control
+
+ZMP represents the point where the ground reaction force acts:
+
+```python
+class ZMPController:
+    """Zero Moment Point balance controller"""
+    
+    def __init__(self):
+        self.foot_width = 0.1  # meters
+        self.foot_length = 0.25  # meters
+        
+        # ZMP stability margin
+        self.stability_margin = 0.02  # meters
+        
+        # Control gains
+        self.kp_zmp = 100
+        self.kd_zmp = 20
+    
+    def compute_zmp(self, com_position, com_velocity, com_acceleration, foot_positions):
+        """Calculate current ZMP position"""
+        
+        # ZMP equation: x_zmp = x_com - (z_com * ddx_com) / (ddz_com + g)
+        # Simplified 2D calculation
+        z_com = com_position[2]
+        ddx_com = com_acceleration[0]  # X acceleration
+        ddz_com = com_acceleration[2]  # Z acceleration
+        
+        x_zmp = com_position[0] - (z_com / (ddz_com + 9.81)) * ddx_com
+        
+        return x_zmp
+    
+    def check_stability(self, zmp_position, support_polygon):
+        """Check if ZMP is within stable region"""
+        
+        # Support polygon is convex hull of contact points
+        min_x = min(p[0] for p in support_polygon) + self.stability_margin
+        max_x = max(p[0] for p in support_polygon) - self.stability_margin
+        
+        return min_x <= zmp_position <= max_x
+    
+    def generate_balance_corrections(self, current_zmp, desired_zmp, com_state):
+        """Generate ankle torques for balance"""
+        
+        zmp_error = desired_zmp - current_zmp
+        
+        # PD control for ZMP
+        ankle_torque = self.kp_zmp * zmp_error - self.kd_zmp * com_state['velocity'][0]
+        
+        return ankle_torque
+```
+
+#### Inertial Measurement Integration
+
+```python
+class IMU_BalanceController:
+    """Balance controller using IMU feedback"""
+    
+    def __init__(self):
+        self.imu = IMU()
+        
+        # Complementary filter for angle estimation
+        self.angle_estimate = 0.0
+        self.alpha = 0.98  # Gyro weight
+        
+        # Balance control parameters
+        self.target_angle = 0.0  # Upright
+        self.kp_balance = 50
+        self.ki_balance = 10
+        self.kd_balance = 5
+        
+        # Integral term
+        self.angle_integral = 0.0
+        self.max_integral = 10.0
+    
+    def update_balance_control(self, dt):
+        """Update balance control using IMU"""
+        
+        # Read IMU data
+        accel_data = self.imu.get_acceleration()
+        gyro_data = self.imu.get_angular_velocity()
+        
+        # Estimate angle using complementary filter
+        accel_angle = math.atan2(accel_data[1], accel_data[2])
+        gyro_angle = self.angle_estimate + gyro_data[0] * dt
+        
+        self.angle_estimate = self.alpha * gyro_angle + (1 - self.alpha) * accel_angle
+        
+        # Calculate balance error
+        angle_error = self.target_angle - self.angle_estimate
+        
+        # Update integral term
+        self.angle_integral += angle_error * dt
+        self.angle_integral = max(-self.max_integral, min(self.max_integral, self.angle_integral))
+        
+        # Calculate derivative term
+        angle_derivative = -gyro_data[0]  # Negative gyro for derivative
+        
+        # PID control
+        ankle_torque = (
+            self.kp_balance * angle_error +
+            self.ki_balance * self.angle_integral +
+            self.kd_balance * angle_derivative
+        )
+        
+        return ankle_torque
+```
+
+## Manipulation and Grasping
+
+### Humanoid Hand Design
+
+```xml
+<!-- Humanoid hand URDF -->
+<link name="palm_link"/>
+<link name="thumb_proximal"/>
+<link name="thumb_distal"/>
+<link name="index_proximal"/>
+<link name="index_middle"/>
+<link name="index_distal"/>
+<!-- Additional fingers: middle, ring, pinky -->
+
+<joint name="thumb_mcp" type="revolute">
+  <parent link="palm_link"/>
+  <child link="thumb_proximal"/>
+  <axis xyz="0 1 0"/>
+  <limit lower="0" upper="1.57" effort="10" velocity="2"/>
+</joint>
+
+<joint name="thumb_pip" type="revolute">
+  <parent link="thumb_proximal"/>
+  <child link="thumb_distal"/>
+  <axis xyz="0 1 0"/>
+  <limit lower="0" upper="1.57" effort="5" velocity="3"/>
+</joint>
+```
+
+### Grasp Planning for Humanoid Hands
+
+```python
+class HumanoidGraspPlanner:
+    """Grasp planning for humanoid hands"""
+    
+    def __init__(self):
+        self.hand_kinematics = HandKinematics()
+        self.force_distribution = ForceDistribution()
+        self.stability_analyzer = GraspStabilityAnalyzer()
+        
+        # Pre-defined grasp types
+        self.grasp_types = {
+            'power_grasp': self.plan_power_grasp,
+            'precision_grasp': self.plan_precision_grasp,
+            'pinch_grasp': self.plan_pinch_grasp
+        }
+    
+    def plan_grasp(self, object_geometry, object_pose, grasp_type='power'):
+        """Plan a complete grasp for humanoid hand"""
+        
+        # Select grasp planning function
+        if grasp_type not in self.grasp_types:
+            grasp_type = 'power'
+        
+        planner = self.grasp_types[grasp_type]
+        
+        # Generate grasp candidates
+        candidates = planner(object_geometry, object_pose)
+        
+        # Evaluate grasp quality
+        best_grasp = None
+        best_score = -float('inf')
+        
+        for candidate in candidates:
+            # Check kinematic feasibility
+            if not self.check_kinematic_feasibility(candidate):
+                continue
+            
+            # Analyze grasp stability
+            stability_score = self.stability_analyzer.analyze(candidate, object_geometry)
+            
+            # Calculate overall score
+            score = self.compute_grasp_score(candidate, stability_score)
+            
+            if score > best_score:
+                best_score = score
+                best_grasp = candidate
+        
+        return best_grasp, best_score
+    
+    def plan_power_grasp(self, object_geometry, object_pose):
+        """Plan power grasp (enclosing object)"""
+        
+        candidates = []
+        
+        # Generate grasp poses around object
+        for angle in range(0, 360, 45):  # 8 candidates
+            # Calculate hand pose
+            hand_pose = self.compute_hand_pose_for_power_grasp(
+                object_pose, angle, object_geometry
+            )
+            
+            # Calculate finger joint angles
+            finger_angles = self.compute_finger_angles_for_power_grasp(
+                object_geometry
+            )
+            
+            candidates.append({
+                'hand_pose': hand_pose,
+                'finger_angles': finger_angles,
+                'grasp_type': 'power'
+            })
+        
+        return candidates
+    
+    def plan_precision_grasp(self, object_geometry, object_pose):
+        """Plan precision grasp (thumb and finger tips)"""
+        
+        candidates = []
+        
+        # Focus on thumb-index finger opposition
+        for approach_angle in range(0, 180, 30):  # 6 candidates
+            hand_pose = self.compute_hand_pose_for_precision_grasp(
+                object_pose, approach_angle, object_geometry
+            )
+            
+            finger_angles = self.compute_finger_angles_for_precision_grasp(
+                object_geometry
+            )
+            
+            candidates.append({
+                'hand_pose': hand_pose,
+                'finger_angles': finger_angles,
+                'grasp_type': 'precision'
+            })
+        
+        return candidates
+    
+    def check_kinematic_feasibility(self, grasp_candidate):
+        """Check if grasp is kinematically possible"""
+        
+        # Check joint limits
+        for joint_name, angle in grasp_candidate['finger_angles'].items():
+            joint_limits = self.hand_kinematics.get_joint_limits(joint_name)
+            if not (joint_limits['min'] <= angle <= joint_limits['max']):
+                return False
+        
+        # Check for self-collisions
+        if self.hand_kinematics.check_self_collision(grasp_candidate['finger_angles']):
+            return False
+        
+        return True
+    
+    def compute_grasp_score(self, candidate, stability_score):
+        """Compute overall grasp quality score"""
+        
+        # Factors: stability, dexterity, comfort, robustness
+        stability_weight = 0.4
+        dexterity_weight = 0.3
+        comfort_weight = 0.2
+        robustness_weight = 0.1
+        
+        dexterity_score = self.compute_dexterity_score(candidate)
+        comfort_score = self.compute_comfort_score(candidate)
+        robustness_score = self.compute_robustness_score(candidate)
+        
+        total_score = (
+            stability_weight * stability_score +
+            dexterity_weight * dexterity_score +
+            comfort_weight * comfort_score +
+            robustness_weight * robustness_score
+        )
+        
+        return total_score
+```
+
+## Human-Robot Interaction Design
+
+### Social Navigation
+
+```python
+class SocialNavigation:
+    """Human-aware navigation for humanoids"""
+    
+    def __init__(self):
+        self.human_detector = HumanDetector()
+        self.intent_predictor = HumanIntentPredictor()
+        self.comfort_analyzer = ComfortAnalyzer()
+        
+        # Social navigation parameters
+        self.personal_space = 0.6  # meters
+        self.approach_angle_preference = 45  # degrees
+    
+    def plan_social_trajectory(self, start_pose, goal_pose, human_positions):
+        """Plan trajectory considering human presence"""
+        
+        # Detect humans in environment
+        humans = self.human_detector.detect_humans()
+        
+        # Predict human intentions
+        human_intents = {}
+        for human_id, human_pose in humans.items():
+            human_intents[human_id] = self.intent_predictor.predict_intent(
+                human_pose, goal_pose
+            )
+        
+        # Generate socially aware path
+        trajectory = self.generate_social_path(
+            start_pose, goal_pose, humans, human_intents
+        )
+        
+        return trajectory
+    
+    def generate_social_path(self, start, goal, humans, intents):
+        """Generate path that respects social norms"""
+        
+        # Use RRT or similar planner with social cost function
+        planner = SociallyAwareRRT(
+            start=start,
+            goal=goal,
+            humans=humans,
+            intents=intents,
+            personal_space=self.personal_space
+        )
+        
+        path = planner.plan()
+        
+        # Smooth path for natural movement
+        smoothed_path = self.smooth_trajectory(path)
+        
+        return smoothed_path
+    
+    def compute_social_cost(self, position, humans, intents):
+        """Compute social cost of being at a position"""
+        
+        total_cost = 0
+        
+        for human_id, human_pos in humans.items():
+            distance = np.linalg.norm(position - human_pos)
+            
+            # Personal space violation
+            if distance < self.personal_space:
+                space_cost = (self.personal_space - distance) ** 2
+                total_cost += space_cost
+            
+            # Intent-based cost
+            intent = intents[human_id]
+            if intent == 'walking_toward':
+                # Give way to approaching humans
+                total_cost += 2.0 / max(distance, 0.1)
+            elif intent == 'standing_still':
+                # Respect stationary humans more
+                total_cost += 1.0 / max(distance, 0.1)
+        
+        return total_cost
+```
+
+## Weekly Project: Humanoid Control System
+
+Build a complete humanoid control system that demonstrates:
+
+1. **Bipedal Locomotion**: Implement walking controller with balance
+2. **Manipulation**: Create grasp planning for humanoid hands
+3. **Whole-Body Control**: Coordinate arms, legs, and torso
+4. **Social Navigation**: Navigate considering human presence
+5. **VLA Integration**: Add basic voice command following
+
+This project will give you hands-on experience with the unique challenges of humanoid robotics.
+
+## Key Takeaways
+
+1. **Humanoid robots require sophisticated balance control** using ZMP and IMU feedback
+2. **Bipedal locomotion involves complex phase coordination** between legs and center of mass
+3. **Dexterous manipulation needs careful grasp planning** considering hand kinematics
+4. **Human-robot interaction demands social awareness** in movement and behavior
+5. **Whole-body coordination is essential** for natural, human-like motion
+
+Mastering humanoid development opens the door to robots that can work seamlessly in human environments, performing tasks that require human-like dexterity and awareness.

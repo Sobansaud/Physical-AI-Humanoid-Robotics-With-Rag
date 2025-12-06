@@ -1,0 +1,91 @@
+---
+slug: /assessments
+---
+
+# Assessment Framework: Demonstrating Physical AI Mastery
+
+This comprehensive assessment structure evaluates your progression from theoretical understanding to practical implementation across all domains of Physical AI. Four major assessments build your skills incrementally, culminating in the capstone project that integrates everything into a fully autonomous system.
+
+## 🏗️ Assessment 1: ROS 2 Package Development Project
+
+**Weeks 3-5 | Weight: 15% | Due: End of Week 5**
+
+### Objective
+Master the foundational communication layer of robotics by building a complete ROS 2 ecosystem that demonstrates distributed system design, real-time communication, and modular architecture.
+
+### Core Requirements
+
+#### System Architecture
+- **Multi-Node Package**: Develop a ROS 2 Python package containing at least 4 interconnected nodes
+- **Communication Patterns**: Implement topics for continuous data streaming, services for request-response operations, and actions for long-running tasks
+- **Parameter System**: Create configurable parameters for runtime tuning of system behavior
+
+#### Functional Components
+- **Sensor Simulation Node**: Publishes realistic sensor data (IMU, odometry, joint states) with configurable noise models
+- **Motion Controller Node**: Subscribes to sensor data and publishes velocity commands via ROS 2 actions
+- **State Estimator Node**: Fuses multiple sensor inputs to maintain accurate robot pose estimation
+- **Monitoring Node**: Logs system performance metrics and provides diagnostic information
+
+#### Quality Assurance
+- **Launch Configuration**: Python launch file that orchestrates all nodes with proper error handling
+- **Testing Framework**: Unit tests covering 80%+ code coverage with pytest
+- **Documentation**: Comprehensive README with setup instructions, API documentation, and architecture diagrams
+
+### Technical Specifications
+```python
+class SensorSimulator(Node):
+    def __init__(self):
+        super().__init__('sensor_simulator')
+        self.publisher_ = self.create_publisher(Imu, '/imu/data', 10)
+        self.declare_parameter('noise_std', 0.01)
+
+class MotionController(Node):
+    def __init__(self):
+        super().__init__('motion_controller')
+        self.action_server = ActionServer(
+            self, FollowJointTrajectory, '/arm_controller/follow_joint_trajectory', self.execute_callback)
+```
+
+### Evaluation Criteria
+- **Functionality (40%)**: All nodes operate correctly with proper ROS 2 integration
+- **Architecture (25%)**: Clean separation of concerns and modular design
+- **Quality (20%)**: Code documentation, testing, and error handling
+- **Performance (15%)**: Real-time operation without message drops or timing violations
+
+### Deliverables
+- GitHub repository with complete ROS 2 package
+- Demo video showing integrated system operation
+- Performance benchmarking report
+
+---
+
+## 🎮 Assessment 2: Gazebo Simulation Implementation
+
+**Weeks 6-7 | Weight: 15% | Due: End of Week 7**
+
+### Objective
+Create a comprehensive digital twin that accurately models robot physics, sensor characteristics, and environmental interactions for reliable sim-to-real transfer.
+
+### Simulation Environment
+
+#### Robot Model Development
+- **URDF/SDF Creation**: Detailed robot description with accurate kinematics, dynamics, and collision properties
+- **Joint Configuration**: Minimum 12 degrees of freedom representing a humanoid or complex manipulator
+- **Physical Properties**: Realistic mass distribution, friction coefficients, and material properties
+
+#### World Design
+- **Complex Environment**: Multi-room layout with furniture, obstacles, and varying terrain
+- **Dynamic Objects**: Movable items that interact with the robot (boxes, tools, furniture)
+- **Lighting Conditions**: Variable illumination to test perception robustness
+
+#### Sensor Integration
+- **Camera Systems**: RGB-D cameras with realistic lens distortion and depth noise
+- **LIDAR Sensors**: Multi-layer LIDAR with accurate beam patterns and range limitations
+- **Inertial Sensors**: IMU with gyroscope and accelerometer simulation
+- **Force/Torque Sensors**: Joint sensors for force control and safety monitoring
+
+### Validation and Testing
+
+- Demonstration video
+- Technical presentation
+

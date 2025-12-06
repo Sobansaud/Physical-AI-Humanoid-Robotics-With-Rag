@@ -1,0 +1,730 @@
+# Week 13: Conversational Robotics - Making Robots Truly Conversational
+
+## Integrating GPT Models for Natural Human-Robot Interaction
+
+This final week brings everything together by teaching you how to create truly conversational robots. You'll learn to integrate large language models like GPT with robotic perception and control systems, enabling natural language understanding, contextual dialogue, and voice-driven task execution. By week's end, you'll have built a conversational humanoid capable of understanding complex commands and engaging in meaningful interaction.
+
+## Speech Recognition and Natural Language Understanding
+
+### Automatic Speech Recognition (ASR)
+
+```python
+import speech_recognition as sr
+from transformers import pipeline
+import torch
+
+class SpeechProcessor:
+    """Complete speech processing pipeline"""
+    
+    def __init__(self):
+        # Initialize speech recognizer
+        self.recognizer = sr.Recognizer()
+        self.microphone = sr.Microphone()
+        
+        # Calibrate for ambient noise
+        with self.microphone as source:
+            self.recognizer.adjust_for_ambient_noise(source, duration=1)
+        
+        # Language model for intent classification
+        self.intent_classifier = pipeline(
+            "text-classification",
+            model="facebook/bart-large-mnli",
+            device=0 if torch.cuda.is_available() else -1
+        )
+        
+        # Named entity recognition
+        self.ner_pipeline = pipeline(
+            "ner",
+            model="dbmdz/bert-large-cased-finetuned-conll03-english",
+            aggregation_strategy="simple"
+        )
+    
+    def listen_and_transcribe(self, timeout=5):
+        """Listen to speech and convert to text"""
+        
+        try:
+            with self.microphone as source:
+                self.get_logger().info("Listening...")
+                audio = self.recognizer.listen(source, timeout=timeout)
+                
+            # Use Google's speech recognition
+            text = self.recognizer.recognize_google(audio)
+            self.get_logger().info(f"Transcribed: {text}")
+            
+            return text
+            
+        except sr.WaitTimeoutError:
+            return None
+        except sr.UnknownValueError:
+            self.get_logger().warning("Could not understand audio")
+            return None
+        except sr.RequestError as e:
+            self.get_logger().error(f"Speech recognition error: {e}")
+            return None
+    
+    def analyze_utterance(self, text):
+        """Analyze transcribed text for intent and entities"""
+        
+        # Classify intent
+        intent_result = self.intent_classifier(
+            text,
+            candidate_labels=[
+                "command", "question", "statement", 
+                "clarification_request", "confirmation"
+            ]
+        )
+        intent = intent_result['labels'][0]
+        intent_confidence = intent_result['scores'][0]
+        
+        # Extract entities
+        entities = self.ner_pipeline(text)
+        
+        # Parse objects, locations, actions
+        parsed_entities = self.parse_entities(entities)
+        
+        return {
+            'intent': intent,
+            'confidence': intent_confidence,
+            'entities': parsed_entities,
+            'raw_text': text
+        }
+    
+    def parse_entities(self, ner_results):
+        """Parse NER results into structured entities"""
+        
+        entities = {
+            'objects': [],
+            'locations': [],
+            'actions': [],
+            'quantities': []
+        }
+        
+        for entity in ner_results:
+            entity_text = entity['word']
+            entity_type = entity['entity_group']
+            
+            if entity_type in ['MISC', 'ORG']:  # Often objects
+                entities['objects'].append(entity_text.lower())
+            elif entity_type == 'LOC':
+                entities['locations'].append(entity_text.lower())
+            elif entity_type == 'PER':  # Could be actions
+                entities['actions'].append(entity_text.lower())
+        
+        # Additional parsing for common patterns
+        # "pick up the red box" -> object: "red box", action: "pick up"
+        text_lower = ner_results[0]['word'].lower() if ner_results else ""
+        
+        if 'pick up' in text_lower or 'grab' in text_lower:
+            entities['actions'].append('pick_up')
+        if 'put' in text_lower or 'place' in text_lower:
+            entities['actions'].append('place')
+        if 'go to' in text_lower or 'move to' in text_lower:
+            entities['actions'].append('navigate')
+        
+        return entities
+```
+
+## Large Language Model Integration
+
+### GPT-Powered Task Understanding
+
+```python
+import openai
+from typing import Dict, List, Optional
+import json
+
+class GPTTaskPlanner:
+    """GPT-powered task planning and reasoning"""
+    
+    def __init__(self, api_key: str, model: str = "gpt-4"):
+        openai.api_key = api_key
+        self.model = model
+        
+        # System prompt for robotic task planning
+        self.system_prompt = """
+        You are an intelligent task planning assistant for a humanoid robot.
+        Your role is to understand natural language commands and break them down
+        into executable robotic actions.
+        
+        Available actions:
+        - navigate_to(location): Move to a specified location
+        - pick_up(object): Grasp an object
+        - place_at(location): Place held object at location
+        - look_at(object/location): Orient gaze toward target
+        - speak(message): Generate speech output
+        - wait(seconds): Pause execution
+        
+        Locations: table, shelf, counter, floor, chair
+        Objects: red_box, blue_cup, green_book, yellow_ball, white_plate
+        
+        Respond with a JSON object containing:
+        - "actions": List of action dictionaries with "type" and "parameters"
+        - "clarifications": List of questions if command is ambiguous
+        - "confidence": Float between 0-1 indicating certainty
+        """
+    
+    def plan_task(self, command: str, context: Dict = None) -> Dict:
+        """Convert natural language command to robotic task plan"""
+        
+        # Build context-aware prompt
+        prompt = f"Command: {command}\n"
+        if context:
+            prompt += f"Context: {json.dumps(context)}\n"
+        prompt += "\nGenerate task plan:"
+        
+        try:
+            response = openai.ChatCompletion.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1,  # Low temperature for consistent planning
+                max_tokens=500
+            )
+            
+            # Parse JSON response
+            result_text = response.choices[0].message.content.strip()
+            
+            # Extract JSON from response
+            json_start = result_text.find('{')
+            json_end = result_text.rfind('}') + 1
+            json_str = result_text[json_start:json_end]
+            
+            plan = json.loads(json_str)
+            
+            # Validate plan structure
+            if not self.validate_plan(plan):
+                return self.create_fallback_plan(command)
+            
+            return plan
+            
+        except Exception as e:
+            self.logger.error(f"GPT planning failed: {e}")
+            return self.create_fallback_plan(command)
+    
+    def validate_plan(self, plan: Dict) -> bool:
+        """Validate generated task plan"""
+        
+        if 'actions' not in plan:
+            return False
+        
+        if not isinstance(plan['actions'], list):
+            return False
+        
+        # Check each action
+        for action in plan['actions']:
+            if 'type' not in action:
+                return False
+            
+            if action['type'] not in ['navigate_to', 'pick_up', 'place_at', 
+                                    'look_at', 'speak', 'wait']:
+                return False
+        
+        return True
+    
+    def create_fallback_plan(self, command: str) -> Dict:
+        """Create simple fallback plan when GPT fails"""
+        
+        return {
+            "actions": [
+                {
+                    "type": "speak",
+                    "parameters": {"message": "I'm not sure how to help with that. Could you rephrase your request?"}
+                }
+            ],
+            "clarifications": ["Could you please rephrase your request more clearly?"],
+            "confidence": 0.0
+        }
+    
+    def refine_plan_with_context(self, plan: Dict, visual_context: Dict) -> Dict:
+        """Refine plan based on visual perception"""
+        
+        # Use GPT to incorporate visual information
+        context_prompt = f"""
+        Original plan: {json.dumps(plan)}
+        Visual context: {json.dumps(visual_context)}
+        
+        Refine the plan based on current visual observations.
+        Update object locations, add clarification requests if needed,
+        or modify actions based on what the robot can actually see.
+        """
+        
+        try:
+            response = openai.ChatCompletion.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are a plan refinement assistant for robots."},
+                    {"role": "user", "content": context_prompt}
+                ],
+                temperature=0.2,
+                max_tokens=300
+            )
+            
+            refined_plan = json.loads(response.choices[0].message.content)
+            return refined_plan
+            
+        except Exception as e:
+            self.logger.error(f"Plan refinement failed: {e}")
+            return plan
+```
+
+## Vision-Language Grounding
+
+### Connecting Language to Visual Perception
+
+```python
+from transformers import CLIPProcessor, CLIPModel
+import torch
+from PIL import Image
+
+class VisionLanguageGrounder:
+    """Ground language descriptions in visual scenes"""
+    
+    def __init__(self):
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        
+        # Load CLIP model
+        self.model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(self.device)
+        self.processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+        
+        # Object vocabulary
+        self.object_classes = [
+            "red box", "blue cup", "green book", "yellow ball", "white plate",
+            "table", "shelf", "counter", "floor", "chair"
+        ]
+    
+    def ground_description(self, description: str, image: Image.Image) -> Dict:
+        """Find objects in image that match description"""
+        
+        # Prepare text inputs
+        text_inputs = [f"a photo of a {obj}" for obj in self.object_classes]
+        text_inputs.append(f"a photo of {description}")
+        
+        # Prepare image input
+        image_input = self.processor(images=image, return_tensors="pt").to(self.device)
+        
+        # Encode text and image
+        text_inputs_processed = self.processor(
+            text=text_inputs, return_tensors="pt", padding=True
+        ).to(self.device)
+        
+        with torch.no_grad():
+            image_features = self.model.get_image_features(**image_input)
+            text_features = self.model.get_text_features(**text_inputs_processed)
+            
+            # Compute similarities
+            similarities = torch.cosine_similarity(
+                image_features.unsqueeze(1), 
+                text_features.unsqueeze(0), 
+                dim=2
+            )
+            
+            # Get best matches
+            best_matches = torch.topk(similarities[0], k=3)
+            
+            results = []
+            for idx, score in zip(best_matches.indices, best_matches.values):
+                obj_name = self.object_classes[idx] if idx < len(self.object_classes) else description
+                results.append({
+                    'object': obj_name,
+                    'confidence': score.item(),
+                    'is_direct_match': idx == len(self.object_classes)
+                })
+        
+        return {
+            'matches': results,
+            'best_match': results[0] if results else None
+        }
+    
+    def resolve_references(self, command: str, detected_objects: List[Dict]) -> Dict:
+        """Resolve linguistic references to detected objects"""
+        
+        # Extract referring expressions
+        references = self.extract_references(command)
+        
+        resolved = {}
+        
+        for ref in references:
+            # Find best matching detected object
+            best_match = None
+            best_score = 0
+            
+            for obj in detected_objects:
+                # Compute matching score based on description similarity
+                score = self.compute_reference_match(ref, obj)
+                
+                if score > best_score:
+                    best_score = score
+                    best_match = obj
+            
+            if best_match and best_score > 0.5:
+                resolved[ref] = best_match
+        
+        return resolved
+    
+    def extract_references(self, command: str) -> List[str]:
+        """Extract object references from command"""
+        
+        # Simple pattern matching (could be enhanced with NLP)
+        words = command.lower().split()
+        references = []
+        
+        # Look for adjective + noun patterns
+        colors = ['red', 'blue', 'green', 'yellow', 'white']
+        objects = ['box', 'cup', 'book', 'ball', 'plate']
+        
+        i = 0
+        while i < len(words) - 1:
+            if words[i] in colors and words[i+1] in objects:
+                references.append(f"{words[i]} {words[i+1]}")
+                i += 2
+            else:
+                i += 1
+        
+        return references
+    
+    def compute_reference_match(self, reference: str, detected_obj: Dict) -> float:
+        """Compute how well a reference matches a detected object"""
+        
+        ref_words = set(reference.lower().split())
+        obj_words = set(detected_obj['class'].lower().split())
+        
+        # Jaccard similarity
+        intersection = len(ref_words & obj_words)
+        union = len(ref_words | obj_words)
+        
+        return intersection / union if union > 0 else 0
+```
+
+## Multi-Modal Dialogue Management
+
+### Conversational State Tracking
+
+```python
+from enum import Enum
+from typing import List, Dict, Any
+
+class DialogueState(Enum):
+    IDLE = "idle"
+    LISTENING = "listening"
+    PROCESSING = "processing"
+    CLARIFYING = "clarifying"
+    EXECUTING = "executing"
+    FEEDBACK = "feedback"
+
+class DialogueManager:
+    """Manage conversational state and context"""
+    
+    def __init__(self):
+        self.state = DialogueState.IDLE
+        self.conversation_history = []
+        self.current_task = None
+        self.pending_clarifications = []
+        
+        # Context tracking
+        self.mentioned_objects = set()
+        self.mentioned_locations = set()
+        self.user_preferences = {}
+    
+    def process_utterance(self, utterance: Dict, visual_context: Dict = None) -> Dict:
+        """Process user utterance and generate response"""
+        
+        # Add to conversation history
+        self.conversation_history.append({
+            'speaker': 'user',
+            'content': utterance,
+            'timestamp': self.get_timestamp()
+        })
+        
+        # Update context
+        self.update_context(utterance)
+        
+        # State machine logic
+        if self.state == DialogueState.IDLE:
+            response = self.handle_new_command(utterance, visual_context)
+        elif self.state == DialogueState.CLARIFYING:
+            response = self.handle_clarification(utterance)
+        elif self.state == DialogueState.EXECUTING:
+            response = self.handle_execution_feedback(utterance)
+        else:
+            response = self.handle_general_input(utterance)
+        
+        # Add response to history
+        self.conversation_history.append({
+            'speaker': 'robot',
+            'content': response,
+            'timestamp': self.get_timestamp()
+        })
+        
+        return response
+    
+    def handle_new_command(self, utterance: Dict, visual_context: Dict) -> Dict:
+        """Handle new command from user"""
+        
+        if utterance['intent'] == 'command':
+            # Generate task plan
+            task_plan = self.generate_task_plan(utterance, visual_context)
+            
+            if task_plan['confidence'] > 0.7:
+                self.state = DialogueState.EXECUTING
+                self.current_task = task_plan
+                
+                return {
+                    'type': 'confirmation',
+                    'message': f"I understand you want me to {utterance['raw_text']}. Starting now.",
+                    'task_plan': task_plan
+                }
+            else:
+                # Need clarification
+                self.state = DialogueState.CLARIFYING
+                self.pending_clarifications = task_plan.get('clarifications', [])
+                
+                return {
+                    'type': 'clarification_request',
+                    'message': "I need some clarification to help you better.",
+                    'questions': self.pending_clarifications
+                }
+        else:
+            return {
+                'type': 'acknowledgment',
+                'message': self.generate_acknowledgment(utterance)
+            }
+    
+    def handle_clarification(self, utterance: Dict) -> Dict:
+        """Handle clarification response"""
+        
+        # Update context with clarification
+        self.update_context(utterance)
+        
+        # Re-plan with additional information
+        task_plan = self.generate_task_plan(
+            self.conversation_history[-2]['content'],  # Original command
+            additional_context=utterance
+        )
+        
+        if task_plan['confidence'] > 0.6:
+            self.state = DialogueState.EXECUTING
+            self.current_task = task_plan
+            self.pending_clarifications = []
+            
+            return {
+                'type': 'confirmation',
+                'message': "Thanks for the clarification. I understand now.",
+                'task_plan': task_plan
+            }
+        else:
+            return {
+                'type': 'further_clarification',
+                'message': "I still need more information.",
+                'questions': task_plan.get('clarifications', [])
+            }
+    
+    def handle_execution_feedback(self, utterance: Dict) -> Dict:
+        """Handle feedback during task execution"""
+        
+        if 'success' in utterance.get('entities', {}):
+            self.state = DialogueState.IDLE
+            self.current_task = None
+            
+            return {
+                'type': 'completion_acknowledgment',
+                'message': "Great! Task completed successfully."
+            }
+        elif 'problem' in utterance.get('entities', {}):
+            # Handle execution issues
+            return {
+                'type': 'error_handling',
+                'message': "I encountered an issue. Let me try a different approach.",
+                'action': 'replanning'
+            }
+        else:
+            return {
+                'type': 'status_update',
+                'message': f"Task is {self.get_task_progress()}% complete."
+            }
+    
+    def update_context(self, utterance: Dict):
+        """Update conversation context"""
+        
+        entities = utterance.get('entities', {})
+        
+        # Track mentioned objects and locations
+        self.mentioned_objects.update(entities.get('objects', []))
+        self.mentioned_locations.update(entities.get('locations', []))
+        
+        # Learn user preferences
+        if 'preference' in utterance:
+            self.user_preferences.update(utterance['preference'])
+    
+    def generate_task_plan(self, utterance: Dict, visual_context: Dict = None, 
+                          additional_context: Dict = None) -> Dict:
+        """Generate task plan from utterance"""
+        
+        # Use GPT planner with context
+        planner = GPTTaskPlanner()
+        
+        context = {
+            'mentioned_objects': list(self.mentioned_objects),
+            'mentioned_locations': list(self.mentioned_locations),
+            'visual_context': visual_context,
+            'additional_context': additional_context
+        }
+        
+        return planner.plan_task(utterance['raw_text'], context)
+    
+    def generate_acknowledgment(self, utterance: Dict) -> str:
+        """Generate appropriate acknowledgment"""
+        
+        if utterance['intent'] == 'question':
+            return "That's an interesting question. Let me think about that."
+        elif utterance['intent'] == 'statement':
+            return "I understand. Is there something specific you'd like me to help with?"
+        else:
+            return "I'm here to help. What would you like me to do?"
+```
+
+## Complete Conversational System Integration
+
+### Putting It All Together
+
+```python
+class ConversationalHumanoid:
+    """Complete conversational humanoid robot system"""
+    
+    def __init__(self):
+        # Initialize components
+        self.speech_processor = SpeechProcessor()
+        self.task_planner = GPTTaskPlanner(api_key="your-openai-key")
+        self.vision_grounder = VisionLanguageGrounder()
+        self.dialogue_manager = DialogueManager()
+        
+        # Robot control interfaces
+        self.navigation_controller = NavigationController()
+        self.manipulation_controller = ManipulationController()
+        self.speech_synthesizer = SpeechSynthesizer()
+        
+        # Perception
+        self.camera = Camera()
+        self.object_detector = ObjectDetector()
+    
+    def run_conversation_loop(self):
+        """Main conversational loop"""
+        
+        self.speech_synthesizer.speak("Hello! I'm ready to help. What would you like me to do?")
+        
+        while True:
+            try:
+                # Listen for command
+                text = self.speech_processor.listen_and_transcribe(timeout=10)
+                
+                if text is None:
+                    continue
+                
+                # Analyze utterance
+                utterance = self.speech_processor.analyze_utterance(text)
+                
+                # Get visual context
+                image = self.camera.capture_image()
+                detections = self.object_detector.detect(image)
+                visual_context = {
+                    'image': image,
+                    'detections': detections
+                }
+                
+                # Process through dialogue manager
+                response = self.dialogue_manager.process_utterance(utterance, visual_context)
+                
+                # Execute response
+                self.execute_response(response)
+                
+            except KeyboardInterrupt:
+                break
+            except Exception as e:
+                self.logger.error(f"Conversation loop error: {e}")
+                self.speech_synthesizer.speak("I'm sorry, I encountered an error. Let's try again.")
+    
+    def execute_response(self, response: Dict):
+        """Execute the generated response"""
+        
+        if response['type'] == 'confirmation':
+            # Start task execution
+            self.execute_task_plan(response['task_plan'])
+            
+        elif response['type'] == 'clarification_request':
+            # Ask for clarification
+            for question in response['questions']:
+                self.speech_synthesizer.speak(question)
+        
+        elif response['type'] == 'completion_acknowledgment':
+            # Acknowledge completion
+            self.speech_synthesizer.speak(response['message'])
+        
+        # Speak the message
+        if 'message' in response:
+            self.speech_synthesizer.speak(response['message'])
+    
+    def execute_task_plan(self, task_plan: Dict):
+        """Execute a generated task plan"""
+        
+        for action in task_plan['actions']:
+            action_type = action['type']
+            params = action.get('parameters', {})
+            
+            try:
+                if action_type == 'navigate_to':
+                    self.navigation_controller.navigate_to(params['location'])
+                    
+                elif action_type == 'pick_up':
+                    # Ground object reference
+                    grounded_obj = self.vision_grounder.ground_description(
+                        params['object'], self.camera.capture_image()
+                    )
+                    if grounded_obj['best_match']:
+                        self.manipulation_controller.pick_up(grounded_obj['best_match'])
+                
+                elif action_type == 'place_at':
+                    self.manipulation_controller.place_at(params['location'])
+                
+                elif action_type == 'look_at':
+                    self.navigation_controller.look_at(params['target'])
+                
+                elif action_type == 'speak':
+                    self.speech_synthesizer.speak(params['message'])
+                
+                elif action_type == 'wait':
+                    time.sleep(params['seconds'])
+                
+                # Provide execution feedback
+                self.speech_synthesizer.speak(f"Completed {action_type}")
+                
+            except Exception as e:
+                self.logger.error(f"Action execution failed: {e}")
+                self.speech_synthesizer.speak(f"I had trouble with {action_type}. Let me try something else.")
+                break
+```
+
+## Weekly Project: Conversational Humanoid System
+
+Build a complete conversational humanoid that can:
+
+1. **Speech Recognition**: Listen and transcribe natural language commands
+2. **Language Understanding**: Parse intents and extract entities using GPT
+3. **Vision-Language Grounding**: Connect linguistic references to visual detections
+4. **Task Planning**: Generate executable action sequences from natural language
+5. **Dialogue Management**: Handle clarifications and maintain conversation context
+6. **Multi-Modal Execution**: Coordinate speech, vision, and physical actions
+
+This capstone project demonstrates the complete integration of conversational AI with humanoid robotics.
+
+## Key Takeaways
+
+1. **Speech recognition enables natural voice interfaces** for human-robot interaction
+2. **Large language models provide sophisticated language understanding** and task planning
+3. **Vision-language grounding connects words to the physical world** through perception
+4. **Dialogue management maintains context** and handles complex interactions
+5. **Multi-modal integration creates truly conversational robots** capable of natural interaction
+
+Mastering conversational robotics transforms robots from programmed machines into intelligent partners capable of understanding and collaborating with humans in natural, intuitive ways.
+
+Congratulations! You have completed the Physical AI curriculum. The conversational humanoid you've built represents the cutting edge of embodied intelligence—a system that can perceive, understand, and act upon the world with human-like capabilities.

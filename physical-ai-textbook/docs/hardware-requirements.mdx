@@ -1,0 +1,239 @@
+---
+slug: /hardware-requirements
+---
+
+# Hardware Requirements: Building Your Physical AI Laboratory
+
+This comprehensive guide outlines the hardware infrastructure needed to establish a world-class Physical AI laboratory. The requirements span simulation workstations, edge computing platforms, robotic hardware, and supporting infrastructure, with detailed cost analysis and implementation strategies.
+
+## 🖥️ Core Simulation Workstation (Required per Student)
+
+The foundation of any Physical AI curriculum is high-performance simulation capability. NVIDIA Isaac Sim and Gazebo demand substantial computational resources for real-time physics simulation and photorealistic rendering.
+
+### GPU Specifications: The Critical Bottleneck
+
+| Specification | Minimum | Recommended | Premium | Cost Range |
+|---------------|---------|-------------|---------|------------|
+| **GPU Model** | RTX 4070 Ti | RTX 4080 | RTX 4090 | $1,200 - $2,000 |
+| **VRAM** | 12 GB | 16 GB | 24 GB | - |
+| **CUDA Cores** | 7,680 | 9,728 | 16,384 | - |
+| **Performance** | Basic Isaac Sim | Smooth workflows | Complex scenes | - |
+
+**Why RTX Series?** Isaac Sim requires RTX-specific ray tracing capabilities for real-time rendering of complex USD scenes. Integrated laptop GPUs cannot handle the computational load.
+
+### Complete Workstation Build
+
+| Component | Specification | Purpose | Cost |
+|-----------|---------------|---------|------|
+| **CPU** | Intel i7-13700K / AMD Ryzen 9 7950X | Physics simulation, compilation | $400-600 |
+| **Motherboard** | Z690/Z790 chipset | High-speed PCIe lanes | $200-300 |
+| **RAM** | 64GB DDR5-5600 | Large simulation scenes, datasets | $300-400 |
+| **Storage** | 1TB NVMe SSD + 2TB HDD | OS, code, simulation assets | $150-250 |
+| **Power Supply** | 1000W 80+ Gold | Stable power for GPU/CPU | $150-200 |
+| **Case + Cooling** | Mid-tower with good airflow | Thermal management | $100-150 |
+| **Monitor** | 27" 1440p 144Hz | Development display | $300-400 |
+| **OS** | Ubuntu 22.04 LTS | Native ROS 2 support | Free |
+
+**Total Cost per Workstation: $2,600 - $3,300**
+
+### Scaling Considerations
+
+- **Student-to-Workstation Ratio**: 1:1 for intensive labs, 2:1 for standard coursework
+- **Shared Resources**: Network storage for large datasets and simulation assets
+- **Maintenance Budget**: 10-15% annually for upgrades and repairs
+
+## 🔧 Edge Computing Platform (Jetson Development Kit)
+
+Physical AI requires deployment on resource-constrained edge devices that mirror real robotic hardware limitations.
+
+### NVIDIA Jetson Comparison
+
+<details>
+<summary>📊 Expand Jetson Model Comparison</summary>
+
+| Model | Jetson Orin Nano | Jetson Orin NX | Jetson AGX Orin |
+|-------|------------------|----------------|-----------------|
+| **Price** | $249 | $399 | $1,999 |
+| **AI Performance** | 40 TOPS | 100 TOPS | 275 TOPS |
+| **GPU** | 512-core Ampere | 1024-core Ampere | 2048-core Ampere |
+| **VRAM** | 8GB | 16GB | 64GB |
+| **Power** | 7-15W | 10-25W | 15-60W |
+| **Best For** | Learning, prototyping | Development, testing | Production deployment |
+| **ROS 2 Compatibility** | ✅ Full | ✅ Full | ✅ Full |
+| **Isaac ROS Support** | ✅ Basic | ✅ Full | ✅ Full |
+
+</details>
+
+### Complete Edge Kit Configuration
+
+| Component | Model | Cost | Purpose |
+|-----------|-------|------|---------|
+| **Compute** | Jetson Orin Nano Super Dev Kit | $249 | AI inference, ROS 2 runtime |
+| **Camera** | Intel RealSense D435i | $349 | RGB-D vision, SLAM |
+| **Microphone** | ReSpeaker 4-Mic Array | $69 | Speech recognition |
+| **Storage** | 256GB microSD | $35 | OS, models, data |
+| **Power** | 25W USB-C Supply | $25 | Reliable power delivery |
+| **Case** | Protective enclosure | $50 | Durability, heat dissipation |
+
+**Total Edge Kit Cost: $777**
+
+### Sensor Expansion Options
+
+<details>
+<summary>🔍 Additional Sensor Configurations</summary>
+
+#### Basic Perception Suite ($1,200 total)
+- LIDAR: Livox Mid-360 ($400)
+- IMU: Bosch BMI088 ($50)
+- Force sensors: 6-axis F/T sensor ($200)
+
+#### Advanced Multi-Modal Setup ($2,500 total)
+- Stereo camera: ZED 2 ($500)
+- Thermal camera: FLIR Lepton ($300)
+- Tactile sensors: Digit sensor ($400)
+- Environmental sensors: Weather station ($200)
+
+</details>
+
+## 🤖 Robotic Hardware Options
+
+Three tiers of robotic platforms accommodate different budget constraints and learning objectives.
+
+### Tier 1: Budget-Conscious Learning (Recommended)
+
+| Robot Type | Model | Cost | Capabilities | Use Case |
+|------------|-------|------|--------------|----------|
+| **Quadruped** | Unitree Go2 Edu | $2,500 | ROS 2 native, SLAM, navigation | Proxy for locomotion studies |
+| **Robotic Arm** | Unitree Z1 | $1,800 | 7-DoF, 8kg payload, vision | Manipulation, grasping tasks |
+| **Mobile Base** | TurtleBot 4 | $1,200 | LIDAR, camera, autonomous navigation | Introductory robotics |
+
+**Total Tier 1 Investment: $3,000-5,500**
+
+### Tier 2: Humanoid Development
+
+| Platform | Model | Cost | Features | Limitations |
+|----------|-------|------|----------|------------|
+| **Mini Humanoid** | Unitree G1 | $16,000 | Bipedal walking, manipulation, SDK | Size constraints |
+| **Educational Humanoid** | Robotis OP3 | $12,000 | Stable platform, ROS integration | Limited AI capabilities |
+| **Micro Humanoid** | Hiwonder TonyPi Pro | $600 | Basic walking, low cost | Raspberry Pi brain, limited performance |
+
+**Total Tier 2 Investment: $12,000-28,000**
+
+### Tier 3: Research-Grade Systems
+
+| System | Model | Cost | Applications |
+|--------|-------|------|--------------|
+| **Full Humanoid** | Unitree H1 | $90,000+ | Advanced locomotion, full-body control |
+| **Research Platform** | Boston Dynamics Atlas | $200,000+ | Extreme environments, heavy manipulation |
+| **Custom Build** | Modular components | $50,000+ | Specialized research applications |
+
+## ☁️ Cloud Infrastructure Alternatives
+
+For institutions with limited capital or distributed student populations.
+
+### AWS RoboMaker Configuration
+
+| Instance Type | vCPU | RAM | GPU | Cost/Hour | Use Case |
+|---------------|------|-----|-----|-----------|----------|
+| g5.2xlarge | 8 | 32GB | A10G (24GB) | $1.50 | Isaac Sim development |
+| g6e.xlarge | 4 | 32GB | L4 (24GB) | $1.20 | Cost-effective simulation |
+| p3.2xlarge | 8 | 61GB | V100 (16GB) | $3.06 | High-performance training |
+
+### Cost Analysis: Cloud vs On-Premise
+
+| Scenario | Cloud (12 weeks, 10 students) | On-Premise (5 workstations) |
+|----------|--------------------------------|----------------------------|
+| **Setup Cost** | $0 | $15,000 |
+| **Monthly Cost** | $2,500 | $0 |
+| **Total 12-week Cost** | $30,000 | $15,000 |
+| **Break-even Point** | - | 6 months |
+| **Flexibility** | High (scale up/down) | Low (fixed capacity) |
+| **Performance** | Variable latency | Consistent high performance |
+
+## 🏗️ Complete Lab Architecture
+
+### Small Lab (5-10 Students)
+
+| Component | Quantity | Unit Cost | Total | Notes |
+|-----------|----------|-----------|-------|-------|
+| Workstations (RTX 4080) | 3 | $3,000 | $9,000 | Shared 2:1 ratio |
+| Edge Kits (Jetson Nano) | 2 | $800 | $1,600 | Development/deployment |
+| Robotic Hardware | 1 | $3,000 | $3,000 | Go2 quadruped |
+| Networking | 1 | $1,000 | $1,000 | Switches, cabling |
+| **Total** | | | **$14,600** | One-time investment |
+
+### Medium Lab (15-25 Students)
+
+| Component | Quantity | Unit Cost | Total | Scaling Notes |
+|-----------|----------|-----------|-------|--------------|
+| Workstations (RTX 4080) | 8 | $3,000 | $24,000 | 3:1 sharing ratio |
+| Edge Kits (Jetson NX) | 5 | $1,000 | $5,000 | Advanced development |
+| Robotic Hardware | 2 | $3,000 | $6,000 | Multiple platforms |
+| Storage/Network | 1 | $3,000 | $3,000 | Centralized resources |
+| **Total** | | | **$38,000** | Supports advanced curriculum |
+
+### Large Lab (25+ Students)
+
+| Component | Quantity | Unit Cost | Total | Advanced Features |
+|-----------|----------|-----------|-------|-------------------|
+| Workstations (RTX 4090) | 12 | $3,500 | $42,000 | Premium performance |
+| Edge Kits (Jetson AGX) | 8 | $2,500 | $20,000 | Production deployment |
+| Robotic Hardware | 4 | $20,000 | $80,000 | Humanoid platforms |
+| Infrastructure | 1 | $10,000 | $10,000 | Advanced networking, storage |
+| **Total** | | | **$152,000** | Research-grade facility |
+
+## 💰 Budget Optimization Strategies
+
+### Phased Implementation
+1. **Phase 1**: Core workstations and edge kits ($20,000)
+2. **Phase 2**: Robotic hardware ($10,000)
+3. **Phase 3**: Advanced equipment as funding allows
+
+### Cost Reduction Techniques
+- **Bulk Purchasing**: 20%+ savings on multiple units
+- **Refurbished Equipment**: 30-50% off for workstations
+- **Shared Resources**: Maximize hardware utilization
+- **Cloud Hybrid**: Mix on-premise and cloud resources
+
+### Funding Sources
+- **Educational Grants**: NSF, DARPA robotics programs
+- **Industry Partnerships**: Sponsorship from robotics companies
+- **Alumni Donations**: Targeted fundraising campaigns
+- **Government Programs**: STEM education initiatives
+
+## 🔧 Maintenance and Upgrades
+
+### Annual Budget Allocation
+- **Hardware Refresh**: 15-20% of initial investment
+- **Software Licenses**: $5,000-10,000 for specialized tools
+- **Consumables**: $2,000-5,000 for sensors, cables
+- **Training**: $3,000-8,000 for faculty development
+
+### Upgrade Timeline
+- **Year 1-2**: Core stability, minor upgrades
+- **Year 3**: Major workstation refresh
+- **Year 4-5**: Complete lab renovation
+
+## 🎯 Recommendations by Institution Type
+
+### University Computer Science Department
+**Priority**: High-end workstations, cloud access
+**Budget**: $30,000-50,000
+**Focus**: Simulation-heavy curriculum
+
+### Robotics Research Lab
+**Priority**: Humanoid platforms, advanced sensors
+**Budget**: $100,000+
+**Focus**: Cutting-edge research
+
+### Community College
+**Priority**: Cost-effective solutions, cloud infrastructure
+**Budget**: $15,000-25,000
+**Focus**: Accessible education
+
+### Corporate Training Program
+**Priority**: Industry-standard equipment, scalability
+**Budget**: $50,000-100,000
+**Focus**: Workforce development
+
+This hardware infrastructure provides the foundation for transformative Physical AI education, enabling students to master the technologies that will shape the future of intelligent robotics.

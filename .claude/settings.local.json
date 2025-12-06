@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch:*)",
+      "Bash(.specify/scripts/powershell/create-new-feature.ps1:*)",
+      "Bash(git checkout:*)",
+      "Bash(npx create-docusaurus@latest:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tailwindcss init:*)",
+      "Bash(./node_modules/.bin/tailwindcss init:*)",
+      "Bash(npm cache clean:*)",
+      "Bash(npx --package=tailwindcss tailwindcss:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(dir:*)",
+      "Bash(mkdir:*)",
+      "Bash(.specify\\scripts\\bash\\create-phr.sh:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git remote:*)",
+      "Bash(git submodule status:*)",
+      "Bash(git init)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

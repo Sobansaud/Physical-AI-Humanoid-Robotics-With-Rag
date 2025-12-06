@@ -1,0 +1,651 @@
+# Week 10: Reinforcement Learning for Robot Control - Learning Through Interaction
+
+## Training Robots to Master Complex Tasks
+
+This final week of Module 3 introduces reinforcement learning (RL), the paradigm that enables robots to learn optimal behaviors through trial and error. You'll discover how to train agents that can walk, manipulate objects, and navigate complex environments—skills that are difficult or impossible to program manually. Through Isaac's RL integration, you'll build systems that improve autonomously, adapting to new tasks and environments.
+
+## Reinforcement Learning Fundamentals
+
+### The RL Framework
+
+Reinforcement learning formalizes learning as an interaction between an agent and its environment:
+
+```python
+import numpy as np
+from abc import ABC, abstractmethod
+
+class RLEnvironment(ABC):
+    """Abstract base class for RL environments"""
+    
+    @abstractmethod
+    def reset(self):
+        """Reset environment to initial state"""
+        pass
+    
+    @abstractmethod
+    def step(self, action):
+        """Execute action and return next state, reward, done"""
+        pass
+    
+    @property
+    @abstractmethod
+    def observation_space(self):
+        """Define observation space"""
+        pass
+    
+    @property
+    @abstractmethod
+    def action_space(self):
+        """Define action space"""
+        pass
+
+class RLAgent(ABC):
+    """Abstract base class for RL agents"""
+    
+    def __init__(self, observation_space, action_space):
+        self.observation_space = observation_space
+        self.action_space = action_space
+    
+    @abstractmethod
+    def act(self, observation):
+        """Choose action given observation"""
+        pass
+    
+    @abstractmethod
+    def learn(self, experience):
+        """Update policy based on experience"""
+        pass
+```
+
+### Markov Decision Processes
+
+RL problems are formulated as MDPs:
+
+```python
+class MDP:
+    def __init__(self, states, actions, transitions, rewards, discount_factor=0.99):
+        self.states = states
+        self.actions = actions
+        self.transitions = transitions  # P(s'|s,a)
+        self.rewards = rewards         # R(s,a,s')
+        self.gamma = discount_factor
+    
+    def get_transition_prob(self, state, action, next_state):
+        """Get probability of transitioning to next_state from state via action"""
+        return self.transitions.get((state, action, next_state), 0.0)
+    
+    def get_reward(self, state, action, next_state):
+        """Get reward for transition"""
+        return self.rewards.get((state, action, next_state), 0.0)
+    
+    def value_iteration(self, epsilon=1e-6):
+        """Solve MDP using value iteration"""
+        V = {s: 0 for s in self.states}  # Value function
+        
+        while True:
+            delta = 0
+            for state in self.states:
+                v = V[state]
+                
+                # Compute new value
+                action_values = []
+                for action in self.actions:
+                    expected_value = 0
+                    for next_state in self.states:
+                        prob = self.get_transition_prob(state, action, next_state)
+                        reward = self.get_reward(state, action, next_state)
+                        expected_value += prob * (reward + self.gamma * V[next_state])
+                    action_values.append(expected_value)
+                
+                V[state] = max(action_values) if action_values else 0
+                delta = max(delta, abs(v - V[state]))
+            
+            if delta < epsilon:
+                break
+        
+        # Extract optimal policy
+        policy = {}
+        for state in self.states:
+            action_values = []
+            for action in self.actions:
+                expected_value = 0
+                for next_state in self.states:
+                    prob = self.get_transition_prob(state, action, next_state)
+                    reward = self.get_reward(state, action, next_state)
+                    expected_value += prob * (reward + self.gamma * V[next_state])
+                action_values.append((action, expected_value))
+            
+            policy[state] = max(action_values, key=lambda x: x[1])[0]
+        
+        return V, policy
+```
+
+## Deep Reinforcement Learning
+
+### Policy Gradient Methods
+
+```python
+import torch
+import torch.nn as nn
+from torch.distributions import Normal
+
+class PolicyNetwork(nn.Module):
+    """Neural network policy for continuous action spaces"""
+    
+    def __init__(self, observation_dim, action_dim, hidden_dim=256):
+        super().__init__()
+        self.network = nn.Sequential(
+            nn.Linear(observation_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, action_dim * 2)  # Mean and std for each action
+        )
+    
+    def forward(self, observation):
+        output = self.network(observation)
+        mean, log_std = output.chunk(2, dim=-1)
+        std = torch.exp(log_std)
+        return mean, std
+    
+    def sample(self, observation):
+        mean, std = self.forward(observation)
+        distribution = Normal(mean, std)
+        action = distribution.sample()
+        log_prob = distribution.log_prob(action).sum(dim=-1)
+        return action, log_prob
+
+class PPOAgent:
+    """Proximal Policy Optimization agent"""
+    
+    def __init__(self, observation_dim, action_dim, lr=3e-4):
+        self.policy = PolicyNetwork(observation_dim, action_dim)
+        self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr)
+        
+        # PPO hyperparameters
+        self.clip_ratio = 0.2
+        self.value_coef = 0.5
+        self.entropy_coef = 0.01
+        
+        # Experience buffer
+        self.buffer = []
+    
+    def act(self, observation):
+        """Sample action from current policy"""
+        obs_tensor = torch.FloatTensor(observation).unsqueeze(0)
+        action, log_prob = self.policy.sample(obs_tensor)
+        return action.squeeze(0).numpy(), log_prob.item()
+    
+    def store_experience(self, observation, action, reward, next_observation, done, log_prob):
+        """Store experience in buffer"""
+        self.buffer.append({
+            'obs': observation,
+            'action': action,
+            'reward': reward,
+            'next_obs': next_observation,
+            'done': done,
+            'log_prob': log_prob
+        })
+    
+    def train(self):
+        """Update policy using PPO"""
+        if len(self.buffer) == 0:
+            return
+        
+        # Convert buffer to tensors
+        obs = torch.FloatTensor([exp['obs'] for exp in self.buffer])
+        actions = torch.FloatTensor([exp['action'] for exp in self.buffer])
+        rewards = torch.FloatTensor([exp['reward'] for exp in self.buffer])
+        next_obs = torch.FloatTensor([exp['next_obs'] for exp in self.buffer])
+        dones = torch.FloatTensor([exp['done'] for exp in self.buffer])
+        old_log_probs = torch.FloatTensor([exp['log_prob'] for exp in self.buffer])
+        
+        # Compute advantages (simplified, typically use GAE)
+        returns = self.compute_returns(rewards, dones)
+        advantages = returns - self.estimate_values(obs)
+        
+        # PPO update
+        for _ in range(10):  # Multiple epochs
+            # Sample mini-batch
+            indices = torch.randperm(len(self.buffer))[:64]
+            
+            batch_obs = obs[indices]
+            batch_actions = actions[indices]
+            batch_advantages = advantages[indices]
+            batch_returns = returns[indices]
+            batch_old_log_probs = old_log_probs[indices]
+            
+            # Compute new log probabilities
+            mean, std = self.policy(batch_obs)
+            distribution = Normal(mean, std)
+            new_log_probs = distribution.log_prob(batch_actions).sum(dim=-1)
+            
+            # Compute ratio
+            ratio = torch.exp(new_log_probs - batch_old_log_probs)
+            
+            # Compute surrogate losses
+            surr1 = ratio * batch_advantages
+            surr2 = torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio) * batch_advantages
+            
+            policy_loss = -torch.min(surr1, surr2).mean()
+            
+            # Value loss (simplified)
+            value_loss = self.value_coef * (batch_returns - self.estimate_values(batch_obs)).pow(2).mean()
+            
+            # Entropy bonus
+            entropy_loss = -self.entropy_coef * distribution.entropy().mean()
+            
+            # Total loss
+            total_loss = policy_loss + value_loss + entropy_loss
+            
+            # Update policy
+            self.optimizer.zero_grad()
+            total_loss.backward()
+            self.optimizer.step()
+        
+        # Clear buffer
+        self.buffer.clear()
+    
+    def compute_returns(self, rewards, dones):
+        """Compute discounted returns"""
+        returns = []
+        R = 0
+        for reward, done in zip(reversed(rewards), reversed(dones)):
+            if done:
+                R = 0
+            R = reward + 0.99 * R
+            returns.insert(0, R)
+        return torch.FloatTensor(returns)
+    
+    def estimate_values(self, observations):
+        """Estimate state values (simplified)"""
+        # In practice, use a separate value network
+        return torch.zeros(len(observations))
+```
+
+## Robotic RL Environments
+
+### Isaac Gym Integration
+
+```python
+from isaac_gym import IsaacGymEnv
+from isaac_rl import RLTrainer
+
+class RoboticManipulationEnv(IsaacGymEnv):
+    """RL environment for robotic manipulation"""
+    
+    def __init__(self):
+        super().__init__()
+        
+        # Initialize Isaac Gym
+        self.gym = gymapi.acquire_gym()
+        self.sim = self.gym.create_sim(...)
+        
+        # Load robot
+        self.robot_asset = self.load_robot_asset("franka_panda.urdf")
+        
+        # Create environment
+        self.env = self.gym.create_env(self.sim, ...)
+        self.robot_handle = self.gym.create_actor(self.env, self.robot_asset, ...)
+        
+        # Initialize state
+        self.reset()
+    
+    def reset(self):
+        """Reset environment to initial state"""
+        # Reset robot to home position
+        self.gym.set_actor_dof_position_targets(
+            self.env, self.robot_handle, self.home_position
+        )
+        
+        # Randomize object position
+        object_pose = self.randomize_object_pose()
+        self.gym.set_actor_rigid_body_transform(
+            self.env, self.object_handle, object_pose
+        )
+        
+        # Get initial observation
+        observation = self.get_observation()
+        
+        return observation
+    
+    def step(self, action):
+        """Execute action and return next state"""
+        # Apply action to robot
+        self.gym.set_actor_dof_position_targets(
+            self.env, self.robot_handle, action
+        )
+        
+        # Step simulation
+        self.gym.simulate(self.sim)
+        self.gym.fetch_results(self.sim, True)
+        
+        # Get new observation
+        next_observation = self.get_observation()
+        
+        # Compute reward
+        reward = self.compute_reward()
+        
+        # Check if episode is done
+        done = self.is_done()
+        
+        return next_observation, reward, done, {}
+    
+    def get_observation(self):
+        """Get current observation"""
+        # Joint positions and velocities
+        dof_states = self.gym.get_actor_dof_states(self.env, self.robot_handle, gymapi.STATE_ALL)
+        
+        # Object pose
+        object_pose = self.gym.get_actor_rigid_body_transform(self.env, self.object_handle)
+        
+        # Combine into observation vector
+        observation = np.concatenate([
+            dof_states['pos'],
+            dof_states['vel'],
+            object_pose.p,
+            object_pose.r
+        ])
+        
+        return observation
+    
+    def compute_reward(self):
+        """Compute reward for current state"""
+        reward = 0
+        
+        # Distance to object
+        robot_eef_pos = self.get_end_effector_position()
+        object_pos = self.get_object_position()
+        distance = np.linalg.norm(robot_eef_pos - object_pos)
+        
+        reward -= distance  # Negative reward for distance
+        
+        # Grasping bonus
+        if self.is_grasping_object():
+            reward += 10
+        
+        # Task completion bonus
+        if self.is_object_in_target():
+            reward += 100
+        
+        return reward
+    
+    @property
+    def observation_space(self):
+        """Define observation space"""
+        return gym.spaces.Box(
+            low=-np.inf, high=np.inf, 
+            shape=(self.get_observation().shape[0],)
+        )
+    
+    @property
+    def action_space(self):
+        """Define action space"""
+        return gym.spaces.Box(
+            low=-1, high=1, 
+            shape=(self.num_dof,)  # Normalized joint positions
+        )
+```
+
+## Advanced RL Techniques for Robotics
+
+### Sample-Efficient Learning
+
+```python
+from isaac_rl.algorithms import SAC
+
+class SampleEfficientAgent:
+    """Soft Actor-Critic for sample-efficient learning"""
+    
+    def __init__(self, observation_dim, action_dim):
+        self.agent = SAC(
+            observation_dim=observation_dim,
+            action_dim=action_dim,
+            hidden_dim=256,
+            discount=0.99,
+            tau=0.005,
+            alpha=0.2
+        )
+        
+        # Experience replay buffer
+        self.buffer = ReplayBuffer(capacity=100000)
+    
+    def act(self, observation, evaluate=False):
+        """Select action"""
+        if evaluate:
+            return self.agent.select_action(observation)
+        else:
+            return self.agent.sample_action(observation)
+    
+    def learn(self, batch_size=256):
+        """Update agent"""
+        if len(self.buffer) < batch_size:
+            return
+        
+        # Sample batch
+        batch = self.buffer.sample(batch_size)
+        
+        # Update agent
+        loss_info = self.agent.update(batch)
+        
+        return loss_info
+    
+    def store_transition(self, observation, action, reward, next_observation, done):
+        """Store experience"""
+        self.buffer.add(observation, action, reward, next_observation, done)
+```
+
+### Multi-Task Learning
+
+```python
+class MultiTaskAgent:
+    """Agent that can learn multiple related tasks"""
+    
+    def __init__(self, task_configs):
+        self.tasks = {}
+        for task_name, config in task_configs.items():
+            self.tasks[task_name] = self.create_task_agent(config)
+        
+        # Shared representation learning
+        self.encoder = SharedEncoder()
+    
+    def learn_multitask(self, experiences):
+        """Learn from multiple tasks simultaneously"""
+        
+        # Encode observations using shared encoder
+        encoded_obs = {}
+        for task_name, exp in experiences.items():
+            encoded_obs[task_name] = self.encoder(exp['observation'])
+        
+        # Update task-specific policies
+        losses = {}
+        for task_name, agent in self.tasks.items():
+            task_exp = experiences[task_name]
+            task_exp['observation'] = encoded_obs[task_name]
+            losses[task_name] = agent.learn(task_exp)
+        
+        # Update shared encoder
+        encoder_loss = self.update_encoder(encoded_obs, losses)
+        
+        return losses, encoder_loss
+```
+
+### Sim-to-Real Transfer
+
+```python
+class Sim2RealTransfer:
+    """Techniques for transferring policies from simulation to reality"""
+    
+    def __init__(self):
+        self.sim_agent = RLAgent(sim_env)
+        self.real_agent = RLAgent(real_env)
+        
+        # Domain adaptation components
+        self.adversarial_adapter = AdversarialAdapter()
+        self.dynamics_randomizer = DynamicsRandomizer()
+    
+    def train_sim2real(self):
+        """Train policy that transfers to reality"""
+        
+        # Phase 1: Train in simulation with domain randomization
+        self.train_with_randomization()
+        
+        # Phase 2: Fine-tune with real data
+        self.fine_tune_real()
+        
+        # Phase 3: Adversarial domain adaptation
+        self.adversarial_adaptation()
+    
+    def train_with_randomization(self):
+        """Train with randomized simulation parameters"""
+        
+        for episode in range(10000):
+            # Randomize environment parameters
+            randomized_env = self.dynamics_randomizer.randomize(self.sim_env)
+            
+            # Train episode
+            trajectory = self.sim_agent.collect_trajectory(randomized_env)
+            self.sim_agent.learn(trajectory)
+    
+    def fine_tune_real(self):
+        """Fine-tune on real robot with safety constraints"""
+        
+        # Use conservative policy for real robot
+        safe_policy = self.create_safe_policy(self.sim_agent.policy)
+        
+        for episode in range(100):
+            trajectory = self.real_agent.collect_trajectory(self.real_env, safe_policy)
+            self.real_agent.learn(trajectory)
+    
+    def adversarial_adaptation(self):
+        """Use adversarial learning to bridge sim-real gap"""
+        
+        # Train discriminator to distinguish sim vs real states
+        # Train policy to fool discriminator
+        for batch in training_batches:
+            # Discriminator update
+            sim_loss = self.adversarial_adapter.discriminate(batch['sim_data'], label=0)
+            real_loss = self.adversarial_adapter.discriminate(batch['real_data'], label=1)
+            disc_loss = sim_loss + real_loss
+            
+            # Policy update
+            policy_loss = self.adversarial_adapter.fool_discriminator(batch['policy_data'])
+            
+            # Combined update
+            total_loss = disc_loss + policy_loss
+            self.update_parameters(total_loss)
+```
+
+## Practical Implementation
+
+### Training Infrastructure
+
+```python
+from isaac_rl.training import RLTrainer
+
+class RoboticRLTrainer:
+    def __init__(self, env, agent, config):
+        self.env = env
+        self.agent = agent
+        self.config = config
+        
+        # Training metrics
+        self.metrics = {
+            'episode_rewards': [],
+            'episode_lengths': [],
+            'policy_losses': [],
+            'value_losses': []
+        }
+    
+    def train(self):
+        """Main training loop"""
+        
+        for episode in range(self.config.num_episodes):
+            # Collect trajectory
+            trajectory = self.collect_trajectory()
+            
+            # Update agent
+            losses = self.agent.learn(trajectory)
+            
+            # Log metrics
+            self.log_metrics(trajectory, losses)
+            
+            # Save checkpoints
+            if episode % self.config.save_freq == 0:
+                self.save_checkpoint(episode)
+    
+    def collect_trajectory(self):
+        """Collect one episode of experience"""
+        
+        trajectory = {
+            'observations': [],
+            'actions': [],
+            'rewards': [],
+            'next_observations': [],
+            'dones': []
+        }
+        
+        observation = self.env.reset()
+        
+        for step in range(self.config.max_steps):
+            # Select action
+            action = self.agent.act(observation)
+            
+            # Execute action
+            next_observation, reward, done, info = self.env.step(action)
+            
+            # Store experience
+            trajectory['observations'].append(observation)
+            trajectory['actions'].append(action)
+            trajectory['rewards'].append(reward)
+            trajectory['next_observations'].append(next_observation)
+            trajectory['dones'].append(done)
+            
+            observation = next_observation
+            
+            if done:
+                break
+        
+        return trajectory
+    
+    def log_metrics(self, trajectory, losses):
+        """Log training metrics"""
+        
+        episode_reward = sum(trajectory['rewards'])
+        episode_length = len(trajectory['rewards'])
+        
+        self.metrics['episode_rewards'].append(episode_reward)
+        self.metrics['episode_lengths'].append(episode_length)
+        self.metrics['policy_losses'].append(losses.get('policy_loss', 0))
+        self.metrics['value_losses'].append(losses.get('value_loss', 0))
+        
+        # Print progress
+        if len(self.metrics['episode_rewards']) % 100 == 0:
+            avg_reward = np.mean(self.metrics['episode_rewards'][-100:])
+            avg_length = np.mean(self.metrics['episode_lengths'][-100:])
+            print(f"Episode {len(self.metrics['episode_rewards'])}: "
+                  f"Avg Reward: {avg_reward:.2f}, Avg Length: {avg_length:.1f}")
+```
+
+## Weekly Project: RL-Powered Robot Control
+
+Develop a reinforcement learning system for robotic control:
+
+1. **Environment Design**: Create Isaac Gym environment for your robot
+2. **Policy Learning**: Train RL agent for manipulation or locomotion tasks
+3. **Reward Engineering**: Design reward functions for desired behaviors
+4. **Sim-to-Real Transfer**: Implement techniques for real-world deployment
+5. **Performance Evaluation**: Assess learning progress and final capabilities
+6. **Safety Integration**: Add constraints for safe real-world operation
+
+This project demonstrates how RL can teach robots complex skills that are difficult to program manually.
+
+## Key Takeaways
+
+1. **Reinforcement learning enables autonomous skill acquisition** through trial and error
+2. **Deep RL combines neural networks with RL** for complex, high-dimensional problems
+3. **Robotic environments require careful reward design** and safety considerations
+4. **Sim-to-real transfer techniques bridge simulation and reality** gaps
+5. **Sample efficiency and safety are critical** for practical robotic RL applications
+
+Mastering reinforcement learning gives your robots the ability to learn and adapt, opening the door to truly autonomous Physical AI systems that improve through experience.

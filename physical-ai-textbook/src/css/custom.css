@@ -1,0 +1,475 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  --font-heading: 'Outfit', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  --color-primary: #00f2ea;
+  --color-secondary: #7000ff;
+  --color-accent: #ff00c8;
+
+  --bg-dark: #050508;
+  --bg-card: rgba(255, 255, 255, 0.03);
+  --border-glass: rgba(255, 255, 255, 0.08);
+}
+
+/* Base Resets & Layout */
+html {
+  scroll-behavior: smooth;
+  height: 100%;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: #fff;
+  font-family: var(--font-body);
+  margin: 0;
+  width: 100%;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Premium Navigation */
+.navbar {
+  background: rgba(5, 5, 8, 0.7) !important;
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-glass);
+}
+
+/* Animated Hero Background */
+.animated-hero-bg {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at center, #1a0b2e 0%, #000000 50%),
+    conic-gradient(from 0deg at 50% 50%, #7000ff, #000, #00f2ea, #000, #7000ff);
+  background-blend-mode: screen;
+  opacity: 0.4;
+  animation: rotate-bg 30s linear infinite;
+  z-index: 0;
+  pointer-events: none;
+}
+
+@keyframes rotate-bg {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.hero-grid-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  mask-image: radial-gradient(circle at center, black 40%, transparent 90%);
+  -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 90%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Typography Animations */
+@keyframes shine {
+  0% {
+    background-position: 0% center;
+  }
+
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/* Premium Buttons */
+.premium-button {
+  position: relative;
+  padding: 16px 40px;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #000;
+  background: #00f2ea;
+  border-radius: 50px;
+  text-decoration: none !important;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 20px rgba(0, 242, 234, 0.4);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.premium-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.premium-button:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 0 40px rgba(0, 242, 234, 0.7);
+  color: #000;
+}
+
+.premium-button:hover::before {
+  transform: translateX(100%);
+}
+
+.premium-button.secondary {
+  background: transparent;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: none;
+}
+
+.premium-button.secondary:hover {
+  border-color: #00f2ea;
+  color: #00f2ea;
+  box-shadow: 0 0 20px rgba(0, 242, 234, 0.2);
+}
+
+/* Bento Grid System */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.bento-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: 24px;
+  padding: 2.5rem;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  backdrop-filter: blur(10px);
+}
+
+.bento-card:hover {
+  transform: translateY(-10px);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.card-glow {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(112, 0, 255, 0.2) 0%, transparent 70%);
+  top: -100px;
+  right: -100px;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.bento-card:hover .card-glow {
+  opacity: 1;
+}
+
+.card-icon {
+  font-size: 3.5rem;
+  margin-bottom: 1.5rem;
+  filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.3));
+}
+
+.bento-card h3 {
+  font-family: var(--font-heading);
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(90deg, #fff, #bbb);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.bento-card p {
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.6;
+  font-size: 1.1rem;
+}
+
+/* Grid Spans */
+.bento-card.large {
+  grid-column: span 1;
+  grid-row: span 2;
+  background: linear-gradient(180deg, rgba(26, 26, 35, 0.5) 0%, rgba(5, 5, 8, 0.8) 100%);
+}
+
+.bento-card.wide {
+  grid-column: span 2;
+}
+
+.bento-card.medium {
+  grid-column: span 1;
+}
+
+/* Footer Upgrade */
+.footer {
+  background: #020203 !important;
+  border-top: 1px solid var(--border-glass);
+  padding: 4rem 0;
+}
+
+.footer__title {
+  color: #fff;
+  font-family: var(--font-heading);
+  letter-spacing: 1px;
+}
+
+.footer__link-item {
+  color: rgba(255, 255, 255, 0.5);
+  transition: color 0.2s;
+}
+
+.footer__link-item:hover {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+/* GitHub Button Style */
+.github-button-nav {
+  display: flex;
+  align-items: center;
+  background-color: #238636;
+  /* GitHub Green or the Blue from image? Image looked Blue. Let's use Blue. */
+  background-color: #1a7f37;
+  /* Wait user said "blue". */
+  background: #0969da;
+  /* GitHub Blue */
+  color: #fff !important;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  transition: background 0.2s;
+  height: 36px;
+  margin-left: 10px;
+  margin-right: 15px !important;
+}
+
+.github-button-nav:hover {
+  background: #0654b5;
+  text-decoration: none;
+  color: #fff !important;
+}
+
+.navbar-start-reading {
+  font-weight: 700;
+  color: var(--color-primary) !important;
+  font-size: 1.05rem;
+}
+
+/* Chatbot UI */
+.chatbot-container {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 2147483647 !important;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+/* TOGGLE BUTTON (Icon) */
+.chatbot-toggle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7000ff 0%, #00f2ea 100%);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 25px rgba(112, 0, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.chatbot-toggle:hover {
+  transform: scale(1.1);
+}
+
+/* CHAT WINDOW */
+.chatbot-window {
+  width: 360px;
+  height: 500px;
+  background: #0a0a0f;
+  border-radius: 20px;
+  box-shadow: 0 10px 50px rgba(0, 0, 0, 0.6);
+  display: none;
+  /* DEFAULT HIDDEN */
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+
+  /* Animation State */
+  margin-bottom: 20px;
+  /* Space between window and icon */
+  transform-origin: bottom right;
+  animation: slideIn 0.3s ease forwards;
+}
+
+.chatbot-window.open {
+  display: flex;
+  /* ONLY VISIBLE WHEN OPEN */
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8) translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.chatbot-header {
+  background: linear-gradient(90deg, #7000ff, #00f2ea);
+  padding: 1rem;
+  border-radius: 20px 20px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #fff;
+  font-weight: 700;
+}
+
+.chatbot-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.message {
+  padding: 10px 15px;
+  border-radius: 12px;
+  max-width: 80%;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.message.bot {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e0e0e0;
+  align-self: flex-start;
+  border-bottom-left-radius: 2px;
+}
+
+.message.user {
+  background: #7000ff;
+  color: #fff;
+  align-self: flex-end;
+  border-bottom-right-radius: 2px;
+}
+
+.chatbot-input-area {
+  padding: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  gap: 10px;
+}
+
+.chatbot-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  color: #fff;
+  outline: none;
+}
+
+.chatbot-send {
+  background: transparent;
+  border: none;
+  color: #00f2ea;
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(112, 0, 255, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 242, 234, 0.5);
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 992px) {
+  .bento-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .bento-card.large {
+    grid-column: span 2;
+    grid-row: span 1;
+  }
+
+  .bento-card.wide {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 600px) {
+  .bento-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bento-card,
+  .bento-card.wide,
+  .bento-card.medium,
+  .bento-card.large {
+    grid-column: span 1;
+  }
+
+  /* Mobile Chatbot Full Screen */
+  .chatbot-window {
+    width: 100% !important;
+    height: 100% !important;
+    position: fixed;
+    /* Override absolute */
+    bottom: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    top: 0 !important;
+    border-radius: 0;
+    margin-bottom: 0;
+    z-index: 2147483648;
+  }
+}

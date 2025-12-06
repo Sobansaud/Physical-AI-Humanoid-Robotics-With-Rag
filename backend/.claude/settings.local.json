@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch:*)",
+      "Bash(ls:*)",
+      "Bash(.specify/scripts/powershell/create-new-feature.ps1:*)",
+      "Bash(git checkout:*)",
+      "Bash(pip install:*)",
+      "Bash(pip freeze:*)",
+      "Bash(uvicorn:*)",
+      "Bash(curl:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(set:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
