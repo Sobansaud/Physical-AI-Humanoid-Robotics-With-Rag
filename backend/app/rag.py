@@ -99,9 +99,9 @@ Q: {question}
 A:"""
 
     async def generate_answer(self, prompt: str) -> str:
-        """Generate answer using Gemini 2.0 Flash"""
+        """Generate answer using Gemini 1.5 Flash"""
         response = await self.openai.chat.completions.create(
-            model="gemini-2.0-flash",
+            model="gemini-1.5-flash",
             messages=[
                 {"role": "user", "content": prompt}
             ],

@@ -46,7 +46,7 @@ export default function ChatbotComponent(): JSX.Element {
                 setIsLoading(true);
 
                 try {
-                    const response = await fetch('https://sobansaud028382-book-backend.hf.space/api/ask-selection', {
+                    const response = await fetch('https://sobansaud028382-huggingnewback.hf.space/api/ask-selection', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -99,7 +99,7 @@ export default function ChatbotComponent(): JSX.Element {
         setIsLoading(true);
 
         try {
-            const response = await fetch('https://sobansaud028382-book-backend.hf.space/api/ask', {
+            const response = await fetch('https://sobansaud028382-huggingnewback.hf.space/api/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ question: newUserMessage.text })
