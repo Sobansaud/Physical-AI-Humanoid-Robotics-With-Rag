@@ -1,21 +1,55 @@
 # Implementation Plan: [FEATURE]
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/sp.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
+---
+id: 3
+title: Physical AI Textbook Frontend — Full Implementation Plan
+stage: plan
+date: 2025-12-04
+surface: agent
+model: claude-sonnet-4-5-20250929
+feature: 1-ai-textbook-frontend
+branch: 1-ai-textbook-frontend
+user: user
+command: /sp.plan
+labels:
+  - plan
+  - docusaurus
+  - premium-ui
+  - real-book-design
+  - responsive
+  - framer-motion
+  - glassmorphism
+links:
+  spec: specs/1-ai-textbook-frontend/spec.md
+  plan: specs/1-ai-textbook-frontend/plan.md
+  ticket: null
+  adr: null
+  pr: null
+files:
+  - specs/1-ai-textbook-frontend/plan.md
+  - specs/1-ai-textbook-frontend/spec.md
+  - sidebars.js
+  - docusaurus.config.js
+  (planned)
+  - src/css/custom.css        (planned)
+  - docs/01-robotic-nervous-system.mdx  (planned)
+  - docs/02-digital-twin.mdx           (planned)
+  - docs/03-ai-robot-brain.mdx         (planned)
+  - docs/04-vision-language-action.mdx (planned)
+  - docs/05-why-physical-ai.mdx         (planned)
+tests:
+  - 6-phase autonomous execution
+  - Lighthouse 95+ target
+  - 700–800 words per chapter
+  - 100% unique & fresh content
+  - GitHub Pages deployment
+---
 
 ## Summary
 
 [Extract from feature spec: primary requirement + technical approach from research]
 
 ## Technical Context
-
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
 
 **Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
 **Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
