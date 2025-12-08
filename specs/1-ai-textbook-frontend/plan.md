@@ -1,5 +1,3 @@
-# Implementation Plan: [FEATURE]
-
 ---
 id: 3
 title: Physical AI Textbook Frontend — Full Implementation Plan
@@ -43,7 +41,10 @@ tests:
   - 700–800 words per chapter
   - 100% unique & fresh content
   - GitHub Pages deployment
+
 ---
+
+# Implementation Plan: [FEATURE]
 
 ## Summary
 
