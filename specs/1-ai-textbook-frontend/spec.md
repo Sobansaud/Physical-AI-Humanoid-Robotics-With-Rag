@@ -1,3 +1,40 @@
+---
+id: 2
+title: Physical AI Textbook Frontend — Premium Docusaurus Book Website
+stage: specification
+date: 2025-12-04
+surface: agent
+model: claude-sonnet-4-5-20250929
+feature: 1-ai-textbook-frontend
+branch: 1-ai-textbook-frontend
+user: user
+command: /sp.specify
+labels:
+  - specification
+  - frontend
+  - docusaurus
+  - premium-ui
+  - real-book
+  - hackathon-winner
+  - responsive
+  - glassmorphism
+  - framer-motion
+links:
+  spec: specs/1-ai-textbook-frontend/spec.md
+  ticket: null
+  adr: null
+  pr: null
+files:
+  - specs/1-ai-textbook-frontend/spec.md
+  - specs/1-ai-textbook-frontend/user-stories.md
+  - specs/1-ai-textbook-frontend/requirements.md
+tests:
+  - 20+ acceptance scenarios defined in spec
+  - Lighthouse 95+ target
+  - 700–800 words per chapter
+  - 100% unique content
+---
+
 # Feature Specification: Physical AI Textbook Frontend
 
 **Feature Branch:** `1-ai-textbook-frontend`  
