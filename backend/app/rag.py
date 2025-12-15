@@ -3,31 +3,23 @@ RAG (Retrieval-Augmented Generation) Engine with Qdrant
 """
 import os
 from typing import List, Dict, Any, Optional
-from openai import AsyncOpenAI
+import cohere
+import asyncio
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COLLECTION_NAME = "textbook_chunks"
-# Gemini text-embedding-004 dimensions = 768 usually, but let's check or assume. 
-# Actually, if we are switching models, we might need to re-index or use a compatible dimension.
-# For now, I will assume we might need to recreate the collection or just update the logic.
-# However, to be safe and simple:
-EMBEDDING_DIM = 768 # text-embedding-004
+EMBEDDING_DIM = 1024  # embed-english-v3.0
 
 
 class RAGEngine:
     def __init__(self):
-        if not GEMINI_API_KEY:
-             raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
-        
-        self.openai = AsyncOpenAI(
-            api_key=GEMINI_API_KEY,
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai"
-        )
-        
+        if not COHERE_API_KEY:
+            raise ValueError("COHERE_API_KEY is not set in the environment variables.")
+        self.cohere = cohere.Client(api_key=COHERE_API_KEY)
         self.qdrant = QdrantClient(
             url=QDRANT_URL,
             api_key=QDRANT_API_KEY if QDRANT_API_KEY else None
@@ -51,12 +43,19 @@ class RAGEngine:
     
     async def embed_query(self, text: str) -> List[float]:
         """Generate embedding for query text"""
-        # Using Gemini's embedding model via OpenAI compat layer
-        response = await self.openai.embeddings.create(
-            model="text-embedding-004",
-            input=text
-        )
-        return response.data[0].embedding
+        try:
+            response = await asyncio.to_thread(self.cohere.embed, texts=[text], model="embed-english-v3.0", input_type="search_query")
+            return response.embeddings[0]
+        except Exception as e:
+            raise RuntimeError(f"Error in embed_query: {e}")
+
+    async def embed_document(self, text: str) -> List[float]:
+        """Generate embedding for document text"""
+        try:
+            response = await asyncio.to_thread(self.cohere.embed, texts=[text], model="embed-english-v3.0", input_type="search_document")
+            return response.embeddings[0]
+        except Exception as e:
+            raise RuntimeError(f"Error in embed_document: {e}")
     
     async def search_vectors(self, query: str, top_k: int = 3) -> List[Dict]:
         """Search Qdrant for similar chunks"""
@@ -99,16 +98,16 @@ Q: {question}
 A:"""
 
     async def generate_answer(self, prompt: str) -> str:
-        """Generate answer using Gemini 1.5 Flash"""
-        response = await self.openai.chat.completions.create(
-            model="gemini-1.5-flash",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.5,
-            max_tokens=200
-        )
-        return response.choices[0].message.content
+        """Generate answer using Cohere command-r-08-2024"""
+        try:
+            response = await asyncio.to_thread(self.cohere.chat, message=prompt, model="command-r-08-2024", max_tokens=200, temperature=0.5)
+            return response.text
+        except AttributeError:
+            # Fallback to generate method if chat is not available
+            response = await asyncio.to_thread(self.cohere.generate, prompt=prompt, model="command-r-08-2024", max_tokens=200, temperature=0.5)
+            return response.generations[0].text
+        except Exception as e:
+            raise RuntimeError(f"Error in generate_answer: {e}")
     
     async def ask(self, question: str) -> Dict[str, Any]:
         """Full RAG pipeline: embed → search → generate"""
@@ -124,7 +123,7 @@ A:"""
         # Build sources
         sources = [
             {"chapter": c["chapter"], "score": round(c["score"], 3)}
-            for c in chunks if c.get("score", 0) > 0.0  # Lower threshold as metrics might differ
+            for c in chunks if c.get("score", 0) > 0.7
         ]
         
         return {
@@ -148,7 +147,7 @@ A:"""
     
     async def index_chunk(self, chunk_id: str, text: str, chapter: str):
         """Index a single chunk into Qdrant"""
-        embedding = await self.embed_query(text)
+        embedding = await self.embed_document(text)
         self.qdrant.upsert(
             collection_name=COLLECTION_NAME,
             points=[
@@ -159,4 +158,3 @@ A:"""
                 )
             ]
         )
-

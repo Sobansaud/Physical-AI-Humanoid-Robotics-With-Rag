@@ -14,7 +14,7 @@ from .rag import RAGEngine
 
 app = FastAPI(
     title="Physical AI Textbook API",
-    description="RAG-powered Q&A for robotics education (Gemini 1.5 Flash)",
+    description="RAG-powered Q&A for robotics education (Cohere)",
     version="2.0.0"
 )
 
@@ -22,9 +22,9 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "*",  # Keep * for now if you want open access, or restrict:
+        "*", 
         "http://localhost:3000",
-        # "https://physical-ai-humanoid-robotics-new.vercel.app"
+        "https://physical-ai-humanoid-robotics-with.vercel.app/"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -50,12 +50,12 @@ class AskResponse(BaseModel):
 # Health Check
 @app.get("/")
 async def root():
-    return {"message": "Physical AI Textbook API (Gemini 1.5 Flash)", "docs": "/docs", "health": "/api/health"}
+    return {"message": "Physical AI Textbook API (Cohere)", "docs": "/docs", "health": "/api/health"}
 
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "service": "physical-ai-textbook-api", "model": "gemini-1.5-flash"}
+    return {"status": "ok", "service": "physical-ai-textbook-api", "model": "command-r-08-2024"}
 
 
 # RAG Endpoints
@@ -70,9 +70,6 @@ async def ask_question(request: AskRequest):
             sources=result.get("sources", [])
         )
     except Exception as e:
-        print(f"Error in /api/ask: {str(e)}")
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -87,9 +84,6 @@ async def ask_about_selection(request: AskSelectionRequest):
         )
         return AskResponse(answer=result["answer"])
     except Exception as e:
-        print(f"Error in /api/ask-selection: {str(e)}")
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
